@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "customer_id": "example-team",
+  "name": "Example Team (fictional)",
+  "sdlc": [
+    {"stage": "discovery", "current": "Product owner describes requests in GitHub issues.", "desired": "Keep GitHub as the source of truth."},
+    {"stage": "planning", "current": "Acceptance criteria are often clarified during review.", "desired": "Clarify criteria before implementation."},
+    {"stage": "implementation", "current": "Engineers implement locally.", "desired": "Use Copilot with an approved plan."},
+    {"stage": "testing", "current": "Run repository tests before review.", "desired": "Record targeted red-green and regression evidence."},
+    {"stage": "review", "current": "Maintainer reviews the PR.", "desired": "Provide an evidence-based local review before human publication."},
+    {"stage": "release", "current": "Maintainer releases manually.", "desired": "Remain outside this workflow."},
+    {"stage": "operations", "current": "Incidents become new issues.", "desired": "Remain outside this workflow."}
+  ],
+  "glossary": {
+    "brief": "The product owner's approved acceptance criteria.",
+    "maintainer": "The human role permitted to publish and merge PRs."
+  },
+  "systems": [
+    {"id": "github", "kind": "issue-tracker-and-repository", "tool": "mcp:github", "capabilities": ["issue-read", "pr-read"]}
+  ],
+  "issue_tracker": {
+    "system_id": "github",
+    "provider": "github",
+    "connection": "mcp",
+    "project": "OWNER/REPOSITORY",
+    "path": null,
+    "skill": null,
+    "mcp": "mcp:github",
+    "capabilities": ["issue-read"]
+  },
+  "roles": ["consultant", "product-owner", "engineer", "maintainer"],
+  "pains": [
+    {"description": "Issues return from review because acceptance criteria differ.", "impact": "Repeated implementation work.", "frequency": "Several issues per sprint in this fictional example."}
+  ],
+  "success_criteria": [
+    "Each implementation has an approved brief and observed test evidence.",
+    "No PR is published without a maintainer's explicit action."
+  ],
+  "constraints": [
+    "Use existing repository tooling.",
+    "Release and operations are outside the chosen workflow.",
+    "Never collect credentials in interview records."
+  ],
+  "facts": [
+    {"id": "fact-review-rework", "statement": "Acceptance ambiguity is the selected bottleneck.", "evidence": "Fictional interview scenario, not real customer data."}
+  ],
+  "assumptions": ["A repository with a runnable test command will be available at execution time."],
+  "unknowns": ["Authentication and repository access must be checked on the actual customer machine."]
+}

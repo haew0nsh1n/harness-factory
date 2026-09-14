@@ -1,0 +1,9 @@
+.git
+.superpowers
+.venv
+.pytest_cache
+__pycache__
+*.py[cod]
+.harness-factory
+web/portal/node_modules
+web/portal/.next
