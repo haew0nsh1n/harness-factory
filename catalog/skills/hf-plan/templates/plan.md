@@ -1,4 +1,4 @@
-# Implementation plan artifact
+# Plan artifact
 
 - Artifact ID: `<plan-artifact-id>`
 - Approved brief artifact ID: `<brief-artifact-id>`
@@ -10,38 +10,50 @@
 - Required outcome: `<approved outcome>`
 - Excluded work: `<approved exclusion>`
 
-## Project surfaces
+## Observed existing surfaces
 
-| Surface ID | Disposition | File or interface | Evidence IDs |
+| Existing surface ID | Observed file or interface | Observation evidence ID |
+| --- | --- | --- |
+| `<existing-surface-id>` | `<observed project-relative path or interface>` | `<observation-evidence-id>` |
+
+## Brief-authorized proposed paths
+
+| Proposed path ID | Proposed path | Brief authorization ID | Placement evidence ID |
 | --- | --- | --- | --- |
-| `<surface-id>` | `<observed-existing|approved-proposed>` | `<observed or proposed project-relative path or interface>` | `<observation ID and, for a proposal, brief authorization ID>` |
+| `<proposed-path-id>` | `<brief-supplied path or path grounded in an observed placement convention>` | `<brief-decision-id>` | `<placement-evidence-id>` |
 
 ## Tasks
 
-### Task `<task-id>`: `<behavior>`
+### Task `<task-id>`: `<approved outcome>`
 
 - Inputs: `<semantic artifact IDs>`
 - Depends on: `<task IDs or none>`
-- Target surfaces: `<verified surface IDs>`
-- Verification mode: `<red-green|validation-only>`
-- Red-green branch: `<focused test, exact command, expected missing-behavior
+- Existing target surfaces: `<observed existing surface IDs or none>`
+- New target paths: `<brief-authorized proposed path IDs or none>`
+- Downstream mode: `<test-first|validation-only>`
+- Test-first branch: `<focused test, exact command, expected missing-behavior
   failure, minimal implementation, green criterion, and regression selectors;
   or not applicable>`
-- Validation-only branch: `<artifact contract, exact authorized validation
-  command or inspection, acceptance criterion, and evidence; or not applicable>`
-- Outputs: `<implementation artifact ID>, <test-results artifact ID>`
+- Validation-only branch: `<smallest documentation or manual-artifact change,
+  exact observed validation command, acceptance criterion, and observed evidence
+  fields to record; or not applicable>`
+- Downstream output IDs fixed by the catalog: `implementation`, `test-results`
+- Output interpretation: `<test-first production change and red/green evidence,
+  or validation-only artifact change and observed validation evidence with no
+  red/green cycle>`
 - Failure or manual gate: `<blocker and resume evidence or none>`
 
 ## Final handoff
 
-- Implementation consumer: `<workflow step ID>`
+- Downstream consumer: `<workflow step ID>`
 - Required artifacts: `<semantic artifact IDs>`
 - Remaining blockers: `<blocker IDs or none>`
 
 ## Example quality
 
-**Good:** Commands, paths, and interfaces are copied from authorized project
-observations, while results remain stated as evidence to collect.
+**Good:** Existing surfaces cite project observations, proposed paths cite the
+brief and placement evidence, and each task defines one mode with the exact
+command and evidence that mode requires.
 
 **Bad:** Inventing a likely file or command, claiming an unrun test passed, or
 adding automatic approval, commit, deployment, or publication steps.

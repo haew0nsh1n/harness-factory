@@ -5,7 +5,7 @@
 - Implementation artifact ID: `<implementation-artifact-id>`
 - Status: `<passed|failed|blocked|flaky>`
 
-## Behavior cycles
+## Test-first behavior cycles
 
 ### Behavior `<behavior-id>`
 
@@ -17,6 +17,17 @@
 - Green command: `<exact observed command or not-run>`
 - Green outcome: `<exit result and relevant observed output or blocker>`
 - Refactor evidence: `<command and outcome or not-performed>`
+
+## Validation-only tasks
+
+### Task `<task-id>`
+
+- Artifact change: `<observed changed documentation or manual-artifact surfaces>`
+- Validation command: `<exact observed command>`
+- Validation outcome: `<exit result and relevant observed output>`
+- Acceptance criterion: `<approved criterion and observed decision>`
+- Observed validation evidence: `<evidence-id>`
+- Red/green cycle: `not-applicable`
 
 ## Regression evidence
 

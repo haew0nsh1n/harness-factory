@@ -181,12 +181,62 @@ class AssetTests(unittest.TestCase):
                 text = (self.catalog_root / path).read_text(encoding="utf-8")
                 self.assertIn("validation-only", text)
 
+    def test_validation_only_plan_executes_without_a_red_green_cycle(self):
+        plan = (
+            self.catalog_root / "skills/hf-plan/SKILL.md"
+        ).read_text(encoding="utf-8")
+        executor = (
+            self.catalog_root / "skills/hf-tdd/SKILL.md"
+        ).read_text(encoding="utf-8")
+        results = (
+            self.catalog_root / "skills/hf-tdd/templates/test-results.md"
+        ).read_text(encoding="utf-8")
+        normalized_plan = " ".join(plan.split())
+        normalized_executor = " ".join(executor.split())
+
+        self.assertIn(
+            "either `test-first` or `validation-only`", normalized_plan
+        )
+        self.assertIn("exact validation command", normalized_plan)
+        self.assertIn("observed validation evidence", normalized_plan)
+        validation_branch = "For an approved `validation-only` task"
+        test_first_branch = "Write one focused test"
+        self.assertIn(validation_branch, normalized_executor)
+        self.assertIn(test_first_branch, normalized_executor)
+        self.assertLess(
+            normalized_executor.index(validation_branch),
+            normalized_executor.index(test_first_branch),
+        )
+        self.assertIn("smallest local change", normalized_executor)
+        self.assertIn("exact validation command", normalized_executor)
+        self.assertIn("observed validation evidence", normalized_executor)
+        self.assertIn("no red/green cycle applies", normalized_executor)
+        self.assertIn(
+            "use validation-only to bypass TDD for code or bug fixes",
+            normalized_executor,
+        )
+        self.assertIn("Only after valid red", normalized_executor)
+        self.assertIn("## Validation-only tasks", results)
+        self.assertIn("Red/green cycle: `not-applicable`", results)
+
     def test_plan_distinguishes_existing_surfaces_from_approved_proposed_paths(self):
         text = (
             self.catalog_root / "skills/hf-plan/references/task-sizing.md"
         ).read_text(encoding="utf-8")
         self.assertIn("Observed existing surfaces", text)
         self.assertIn("Approved proposed paths", text)
+
+    def test_plan_template_never_labels_proposed_paths_as_verified(self):
+        text = (
+            self.catalog_root / "skills/hf-plan/templates/plan.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("## Observed existing surfaces", text)
+        self.assertIn("## Brief-authorized proposed paths", text)
+        self.assertNotIn("## Project surfaces", text)
+        self.assertNotIn("<verified surface IDs>", text)
+        proposed_paths = text.split("## Brief-authorized proposed paths", 1)[1]
+        proposed_paths = proposed_paths.split("## Tasks", 1)[0]
+        self.assertNotIn("verified", proposed_paths.lower())
 
     def test_markdown_issue_skill_has_read_only_branch_and_evidence(self):
         text = (

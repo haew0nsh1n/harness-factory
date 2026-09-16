@@ -24,7 +24,7 @@ evidence is missing, leave the path unresolved and block the affected task.
 ## Choose task boundaries
 
 A task is the smallest useful unit that ends with an independently reviewable
-deliverable. An executable behavior task carries one coherent red-green cycle.
+deliverable. An executable behavior task uses one coherent `test-first` cycle.
 A documentation or manual-artifact task with no executable behavior uses a
 `validation-only` branch instead. Include setup, configuration, documentation,
 and cleanup in the task whose deliverable needs them. Split tasks when either
@@ -37,7 +37,7 @@ the same file changes.
 
 ## Required verification detail
 
-For each executable behavior task record:
+For each `test-first` executable behavior task record:
 
 1. The test and assertion that would fail before the change.
 2. The exact observed project command that targets it.
@@ -51,10 +51,18 @@ These are future evidence requirements. A plan must not report commands as run
 or tests as passed.
 
 For each `validation-only` documentation or manual-artifact task record the
-artifact contract, exact authorized validation command or inspection, acceptance
-criterion, and handoff evidence. Do not manufacture a failing test for prose or
-a human-only action. If no reliable validation is available, block and name the
-evidence needed rather than claiming the artifact is valid.
+smallest authorized artifact change, exact validation command observed in
+authorized project tooling, acceptance criterion, and observed validation
+evidence fields the executor must record. Do not manufacture a failing test for
+prose or a human-only action. If no reliable command is available, block and
+name the evidence needed rather than claiming the artifact is valid.
+
+Both modes retain the downstream execution skill's catalog output IDs
+`implementation` and `test-results`. For `test-first`, those artifacts contain
+the production change and red/green evidence. For `validation-only`, they
+contain the exact documentation or manual artifact change and its observed
+validation command, exit result, and output, with the red/green cycle marked not
+applicable.
 
 ## Handoffs and blockers
 
@@ -64,10 +72,10 @@ gate is a blocker with a resume condition, not an invitation to improvise.
 
 ## Good and bad examples
 
-**Good:** A behavior task names `<verified-test-interface>`, records
+**Good:** A `test-first` task names `<verified-test-interface>`, records
 `<observed-focused-command>`, and expects `<missing-behavior-assertion>`. A
 `validation-only` artifact task names `<artifact-contract-id>` and
-`<authorized-validation-evidence>` without inventing red/green results.
+`<observed-validation-command>` without inventing red/green results.
 
 **Bad:** “Update the relevant files and run all tests.” It names no verified
-surface, testable boundary, expected red evidence, or consumer handoff.
+surface, verification mode, evidence contract, or consumer handoff.

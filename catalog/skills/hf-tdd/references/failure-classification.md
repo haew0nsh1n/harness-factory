@@ -1,7 +1,8 @@
-# Test outcome classification
+# Test-first outcome classification
 
-Read this reference after every focused red attempt and whenever later test
-evidence is ambiguous.
+Read this reference after every focused red attempt for a `test-first` task and
+whenever later test evidence is ambiguous. An approved `validation-only` task
+does not enter this classification gate and must not be labeled red or green.
 
 ## Classification gate
 
@@ -35,6 +36,10 @@ evidence. Do not fix unrelated failures without authorization. The regression
 scope should cover direct callers, shared interfaces, state or enum consumers,
 and failure paths identified by the approved plan—no narrower and no invented
 full-suite claim.
+
+For `validation-only`, record the exact approved command, observed exit result,
+relevant output, acceptance decision, and any blocker. Mark the red/green cycle
+not applicable; do not reinterpret validation output as test-first evidence.
 
 ## Blocked-test record
 
