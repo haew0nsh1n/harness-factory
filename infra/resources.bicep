@@ -230,7 +230,7 @@ module api 'container-app.bicep' = {
     env: concat(backendEnv, openAiEnv)
     secrets: backendSecrets
     command: apiCommand
-    minReplicas: 0
+    minReplicas: 1
     maxReplicas: 1
   }
   dependsOn: [
@@ -288,8 +288,8 @@ module portal 'container-app.bicep' = {
     external: true
     env: portalEnv
     secrets: portalSecrets
-    minReplicas: 0
-    maxReplicas: 2
+    minReplicas: 1
+    maxReplicas: 1
   }
   dependsOn: [
     acrPull
