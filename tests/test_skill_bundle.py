@@ -68,6 +68,18 @@ def test_skill_resource_hashes_exclude_only_the_manifest(tmp_path: Path) -> None
     }
 
 
+def test_skill_resource_hashes_include_nested_bundle_named_resources(tmp_path: Path) -> None:
+    skill = make_bundle(tmp_path)
+    nested_manifest = skill / "references" / "bundle.json"
+    nested_manifest.write_text("nested resource\n")
+
+    hashes = skill_resource_hashes(skill)
+
+    assert hashes["references/bundle.json"] == hashlib.sha256(
+        b"nested resource\n"
+    ).hexdigest()
+
+
 def test_skill_bundle_digest_is_canonical_across_resource_mapping_order() -> None:
     resources = {
         "templates/report.md": "c" * 64,

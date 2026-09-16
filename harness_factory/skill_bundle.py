@@ -17,7 +17,7 @@ def skill_resource_hashes(skill_root: Path) -> dict[str, str]:
     for path in sorted(root.rglob("*")):
         checked = no_symlinks(path)
         require(checked.is_file() or checked.is_dir(), "skill bundle: unsupported entry")
-        if checked.is_file() and checked.name != MANIFEST_NAME:
+        if checked.is_file() and checked != root / MANIFEST_NAME:
             relative = checked.relative_to(root).as_posix()
             hashes[relative] = hashlib.sha256(checked.read_bytes()).hexdigest()
     require("SKILL.md" in hashes, "skill bundle: missing SKILL.md")
