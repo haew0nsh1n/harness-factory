@@ -13,10 +13,14 @@ import argparse
 import json
 import sys
 
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from web.api.config import Settings, get_settings
 from web.api.db import session_scope
+from web.api.designs.repository import ensure_sqlite_write_transaction
+from web.api.designs.samples import SampleDesignSeedInvalid, seed_sample_designs
 from web.api.identity.models import ROLES
 from web.api.organizations.models import Membership, Organization
 
@@ -62,18 +66,38 @@ def bootstrap_development_tenant(
     roles = parse_development_roles(settings.development_roles)
     organization_id = settings.development_organization_id
     subject_id = settings.development_subject_id
+    ensure_sqlite_write_transaction(session)
 
-    organization = session.get(Organization, organization_id)
+    organization = session.scalar(
+        select(Organization)
+        .where(Organization.id == organization_id)
+        .with_for_update()
+    )
     created_organization = organization is None
     if organization is None:
-        session.add(
-            Organization(
-                id=organization_id,
-                entra_tenant_id=f"development-{organization_id}",
-                name=settings.development_organization_name,
+        try:
+            with session.begin_nested():
+                organization = Organization(
+                    id=organization_id,
+                    entra_tenant_id=f"development-{organization_id}",
+                    name=settings.development_organization_name,
+                )
+                session.add(organization)
+                session.flush()
+        except IntegrityError:
+            session.expire_all()
+            organization = session.scalar(
+                select(Organization)
+                .where(Organization.id == organization_id)
+                .with_for_update()
             )
+            if organization is None:
+                raise
+            created_organization = False
+    if organization.entra_tenant_id != f"development-{organization_id}":
+        raise DevelopmentBootstrapInvalid(
+            "configured development organization has a conflicting tenant marker"
         )
-        session.flush()
 
     membership = session.get(Membership, (organization_id, subject_id))
     created_membership = membership is None
@@ -105,21 +129,49 @@ class _Parser(argparse.ArgumentParser):
 
 
 def parser() -> argparse.ArgumentParser:
-    return _Parser(
+    result = _Parser(
         description="Create the development organization and membership.",
     )
+    result.add_argument(
+        "--with-sample-designs",
+        action="store_true",
+        help="insert missing fictional draft sample designs",
+    )
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
     try:
-        parser().parse_args(argv)
+        args = parser().parse_args(argv)
         settings = get_settings()
         _require_development_mode(settings)
+        if args.with_sample_designs:
+            roles = parse_development_roles(settings.development_roles)
+            if "author" not in roles:
+                raise DevelopmentBootstrapInvalid(
+                    "--with-sample-designs requires the configured development "
+                    "identity to have the author role"
+                )
         with session_scope() as session:
             result = bootstrap_development_tenant(session, settings)
+            if args.with_sample_designs:
+                samples = seed_sample_designs(
+                    session,
+                    organization_id=settings.development_organization_id,
+                    actor_id=settings.development_subject_id,
+                )
+                result["sample_designs"] = [
+                    {
+                        "id": sample.design_id,
+                        "template": sample.template_key,
+                        "created": sample.created,
+                    }
+                    for sample in samples
+                ]
     except (
         DevelopmentBootstrapNotAllowed,
         DevelopmentBootstrapInvalid,
+        SampleDesignSeedInvalid,
         ValueError,
     ) as exc:
         print(

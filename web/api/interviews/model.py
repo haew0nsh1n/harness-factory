@@ -2,7 +2,7 @@ from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .schemas import DraftCandidate, InterviewReply, Stage
+from .schemas import DraftCandidate, InterviewOption, InterviewReply, LifecycleStage, Stage
 
 
 class ImmutableModel(BaseModel):
@@ -13,6 +13,10 @@ class InterviewTurn(ImmutableModel):
     id: str = Field(min_length=1, max_length=128)
     role: Literal["user", "assistant"]
     text: str = Field(min_length=1)
+    options: tuple[InterviewOption, ...] = ()
+    allow_custom_answer: bool = True
+    choice_question_turn_id: str | None = None
+    choice_option_id: str | None = None
 
 
 class ConfirmedEvidence(ImmutableModel):
@@ -28,6 +32,15 @@ class InterviewContext(ImmutableModel):
     confirmed_evidence: tuple[ConfirmedEvidence, ...]
     stage: Stage
     selected_scope: str | None
+    selected_stages: tuple[LifecycleStage, ...] = (
+        "discovery",
+        "planning",
+        "implementation",
+        "testing",
+        "review",
+        "release",
+        "operations",
+    )
 
 
 class InterviewModel(Protocol):

@@ -381,7 +381,8 @@ export HF_AZURE_OPENAI_DEPLOYMENT=gpt-5.6-sol
 export HF_AUTH_MODE=development
 export HF_ALLOW_INSECURE_DEVELOPMENT_AUTH=true
 uv run --frozen --no-config alembic upgrade head
-uv run --frozen --no-config python -m web.api.organizations.bootstrap
+uv run --frozen --no-config python -m web.api.organizations.bootstrap \
+  --with-sample-designs
 uv run --frozen --no-config uvicorn web.api.main:create_app \
   --factory --host 127.0.0.1 --port 8000
 ```
@@ -480,8 +481,9 @@ docker compose up --build
 - `postgres`: PostgreSQL 16, named volume `postgres-data`.
   `backend` internal network에만 연결되며 호스트로 포트를 노출하지 않습니다.
 - `api`: `web/api/Dockerfile` 이미지, 시작 전에 `alembic upgrade head`와
-  `python -m web.api.organizations.bootstrap`을 실행한 뒤 Uvicorn을 컨테이너
-  8000 포트에 기동하고, 호스트에는 `127.0.0.1:8000`으로만 publish합니다.
+  `python -m web.api.organizations.bootstrap --with-sample-designs`를 실행한 뒤
+  Uvicorn을 컨테이너 8000 포트에 기동하고, 호스트에는
+  `127.0.0.1:8000`으로만 publish합니다.
 - `worker`: API와 같은 Python 이미지를 사용하고 동일한 bootstrap을 실행한 뒤
   `python -m web.api.builds.worker`를 실행합니다. `restart: unless-stopped`로
   DB 재시작이나 연결 단절 이후에도 복구합니다. worker 프로세스는 엔진과
@@ -500,17 +502,50 @@ Compose의 PostgreSQL은 비어 있는 상태로 시작하므로 모든 authorin
 참조하는 개발 조직과 subject membership을 먼저 만들어야 합니다.
 
 ```bash
-docker compose exec api python -m web.api.organizations.bootstrap
+docker compose exec api python -m web.api.organizations.bootstrap \
+  --with-sample-designs
 ```
 
 - 멱등(idempotent)합니다. 이미 있으면 다시 만들지 않고 역할만 설정값에 맞춥니다.
+- `--with-sample-designs`는 API bootstrap에만 명시적으로 사용합니다. worker의
+  bootstrap과 플래그 없는 명령은 조직과 membership만 다룹니다.
 - `HF_DEVELOPMENT_ORGANIZATION_ID`(기본 `local-dev`),
   `HF_DEVELOPMENT_SUBJECT_ID`(기본 `portal-dev`), `HF_DEVELOPMENT_ROLES`를 씁니다.
   포털 프록시의 `HF_DEV_ORGANIZATION`/`HF_DEV_SUBJECT`/`HF_DEV_ROLES`와 같은 값입니다.
 - `HF_AUTH_MODE=development`와 `HF_ALLOW_INSECURE_DEVELOPMENT_AUTH=true`가
   아니면 실행을 거부합니다.
+- 기존 조직의 tenant marker가 `development-<organization-id>`와 다르면
+  membership이나 sample을 바꾸기 전에 거부합니다. 다른 tenant를 열거하거나
+  production 데이터를 자동 seed하지 않습니다.
+- 플래그를 사용하면 현재 개발 조직에 다음 네 개의 한국어 design을 `draft`,
+  revision 1로만 추가합니다: `이슈 명확화와 실행 계획`, `테스트 우선 구현`,
+  `근거 기반 코드 리뷰`, `리뷰 후 수동 PR 인계`. ID는 조직과 template key로
+  결정되므로 이름을 바꿔도 같은 샘플로 인식합니다.
+- 반복 실행은 빠진 샘플만 추가합니다. 기존 샘플의 이름, 본문, status, digest,
+  revision, timestamp와 다른 tenant의 데이터는 변경하지 않습니다. Compose의
+  `postgres-data` named volume이 남아 있는 한 컨테이너를 다시 만들어도 편집은
+  보존됩니다. 샘플을 처음부터 다시 만들려는 목적으로 volume을 삭제하지 마세요.
+- 샘플은 가상 고객과 미검증 환경을 설명하는 편집용 초안입니다.
+  `workflow.approved`의 고정 fixture 작성자/시각은 필수 JSON schema metadata일
+  뿐 고객 승인이 아닙니다. bootstrap은 Approval, Build, Registry 또는
+  Evaluation 레코드를 만들지 않으며, 실제 validate와 exact-digest reviewer
+  승인은 계속 필요합니다.
 - 존재하지 않는 tenant나 resource를 참조하는 요청은 FK 위반 500이 아니라
   `409 {"ok":false,"error":"referenced tenant or resource does not exist","code":"missing_reference"}`로 응답합니다.
+
+### 인터뷰 범위 선택과 처리 상태
+
+- SDLC 범위는 비어 있을 수 없는 checkbox 부분집합입니다. 기본 선택은
+  `planning`, `implementation`, `review`이며 사용자가 선택한 범위와 그 요약만
+  후속 인터뷰와 초안 생성에 사용합니다.
+- 답변은 제시된 단일 선택지를 고르거나 custom text를 입력하는 방식입니다.
+  어느 경우든 `보내기`를 명시적으로 눌러야 하며 선택이나 입력만으로 자동
+  전송하지 않습니다.
+- 처리 중에는 요청 단계에 맞는 status를 표시하고, 완료·실패·재시도 가능 상태를
+  구분합니다. 원본 debug JSON은 기본적으로 접어 두되 오류가 발생해도 삭제하거나
+  성공 응답으로 덮지 않아 진단 근거를 보존합니다.
+- 샘플 gallery는 별도로 필요하지 않습니다. 개발 bootstrap의 네 draft는 기존
+  design 목록에 한국어 이름으로 나타나며 자유롭게 편집할 수 있습니다.
 
 ### 개발 인증과 프로덕션 경계
 

@@ -9,6 +9,9 @@ web/portal/node_modules/
 artifacts-download/
 uv-mirror.lock
 
+# azd
+.azure/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

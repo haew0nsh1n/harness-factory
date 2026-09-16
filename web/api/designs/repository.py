@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import delete, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from web.api.designs.digest import design_digest
@@ -17,9 +18,23 @@ from web.api.designs.models import (
 from web.api.designs.schemas import HarnessDesignRequest
 
 
+def ensure_sqlite_write_transaction(session: Session) -> None:
+    connection = session.connection()
+    if connection.dialect.name != "sqlite":
+        return
+    driver_connection = connection.connection.driver_connection
+    if not driver_connection.in_transaction:
+        connection.exec_driver_sql("BEGIN IMMEDIATE")
+
+
 @dataclass(frozen=True)
 class StaleDraftDigest(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class SeedDesignIdentityCollision(Exception):
+    design_id: str
 
 
 class HarnessDesignRepository:
@@ -55,6 +70,60 @@ class HarnessDesignRepository:
         self._session.add(design)
         self._session.flush()
         return design
+
+    def insert_seed_if_missing(
+        self,
+        *,
+        design_id: str,
+        organization_id: str,
+        actor_id: str,
+        request: HarnessDesignRequest,
+    ) -> tuple[HarnessDesign, bool]:
+        existing = self._session.get(HarnessDesign, design_id)
+        if existing is not None:
+            self._validate_seed_identity(existing, organization_id)
+            return existing, False
+
+        try:
+            with self._session.begin_nested():
+                design = HarnessDesign(
+                    id=design_id,
+                    organization_id=organization_id,
+                    customer_id=request.customer_id,
+                    name=request.name,
+                    profile_json=request.profile,
+                    workflow_json=request.workflow,
+                    scenarios_json=request.scenarios,
+                    catalog_json=request.catalog,
+                    validation_findings_json=None,
+                    revision=1,
+                    digest=design_digest(
+                        request.profile,
+                        request.workflow,
+                        request.scenarios,
+                        request.catalog,
+                    ),
+                    status=DESIGN_STATUS_DRAFT,
+                    created_by=actor_id,
+                )
+                self._session.add(design)
+                self._session.flush()
+            return design, True
+        except IntegrityError:
+            self._session.expire_all()
+            existing = self._session.get(HarnessDesign, design_id)
+            if existing is None:
+                raise
+            self._validate_seed_identity(existing, organization_id)
+            return existing, False
+
+    @staticmethod
+    def _validate_seed_identity(
+        design: HarnessDesign,
+        organization_id: str,
+    ) -> None:
+        if design.organization_id != organization_id:
+            raise SeedDesignIdentityCollision(design.id)
 
     def list(self, organization_id: str) -> Sequence[HarnessDesign]:
         return self._session.scalars(

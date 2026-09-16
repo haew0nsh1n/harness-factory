@@ -1,9 +1,10 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from harness_factory.contracts import PROJECT_PART, SYSTEM_TOKEN, TOOL
 from web.api.validation import require_sha256_digest
 
 
@@ -21,6 +22,42 @@ Stage = Literal[
     "operations",
     "summary",
 ]
+LifecycleStage = Literal[
+    "discovery",
+    "planning",
+    "implementation",
+    "testing",
+    "review",
+    "release",
+    "operations",
+]
+WORKFLOW_ID_PATTERN = r"^[a-z][a-z0-9-]*$"
+SYSTEM_TOOL_PATTERN = "^" + SYSTEM_TOKEN.pattern.removesuffix(r"\Z") + "$"
+TOOL_BINDING_PATTERN = "^" + TOOL.pattern.removesuffix(r"\Z") + "$"
+MARKDOWN_PROJECT_PATTERN = f"^{PROJECT_PART}$"
+REMOTE_PROJECT_PATTERN = (
+    f"^(?:{PROJECT_PART}/{PROJECT_PART}|[A-Z][A-Z0-9_-]*)$"
+)
+MachineId = Annotated[str, Field(pattern=WORKFLOW_ID_PATTERN)]
+SystemTool = Annotated[str, Field(pattern=SYSTEM_TOOL_PATTERN)]
+ToolBinding = Annotated[str, Field(pattern=TOOL_BINDING_PATTERN)]
+McpConnector = Annotated[str, Field(pattern=r"^mcp:[a-z][a-z0-9-]*$")]
+TrackerCapability = Literal[
+    "issue-read",
+    "issue-create",
+    "issue-update",
+    "issue-transition",
+    "issue-comment",
+]
+
+
+class InterviewOption(StrictModel):
+    id: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$",
+    )
+    label: str = Field(min_length=1, max_length=200)
 
 
 class StartInterviewRequest(StrictModel):
@@ -31,12 +68,42 @@ class StartInterviewRequest(StrictModel):
     consent_version: Literal["2026-09-15"]
     consent_accepted: Literal[True]
     request_id: UUID = Field(strict=False)
+    selected_stages: list[LifecycleStage] | None = Field(
+        default=None, min_length=1, max_length=7
+    )
+
+    @field_validator("selected_stages")
+    @classmethod
+    def require_unique_stages(
+        cls, value: list[LifecycleStage] | None
+    ) -> list[LifecycleStage] | None:
+        if value is not None and len(value) != len(set(value)):
+            raise ValueError("selected stages must be unique")
+        return value
+
+
+class ChoiceAnswer(StrictModel):
+    question_turn_id: UUID = Field(strict=False)
+    option_id: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$",
+    )
 
 
 class AnswerRequest(StrictModel):
     expected_revision: int = Field(ge=0)
     request_id: UUID = Field(strict=False)
-    answer: str = Field(min_length=1, max_length=8000)
+    answer: str | None = Field(default=None, min_length=1, max_length=8000)
+    choice_answer: ChoiceAnswer | None = None
+
+    @model_validator(mode="after")
+    def require_exactly_one_answer(self) -> "AnswerRequest":
+        if (self.answer is None) == (self.choice_answer is None):
+            raise ValueError("provide exactly one answer or choice_answer")
+        if self.answer is not None and not self.answer.strip():
+            raise ValueError("answer must not be blank")
+        return self
 
 
 class EvidenceDecision(StrictModel):
@@ -97,6 +164,10 @@ class InterviewTurnResponse(StrictModel):
     text: str
     sequence: int
     created_at: datetime
+    options: list[InterviewOption] = Field(default_factory=list, max_length=6)
+    allow_custom_answer: bool = True
+    choice_question_turn_id: str | None = None
+    choice_option_id: str | None = None
 
 
 class EvidenceResponse(StrictModel):
@@ -127,6 +198,7 @@ class InterviewOperationResponse(StrictModel):
     request_id: str
     kind: str
     status: str
+    lease_expired: bool
 
 
 class InterviewSessionResponse(StrictModel):
@@ -140,6 +212,7 @@ class InterviewSessionResponse(StrictModel):
     consent_version: str
     consented_at: datetime
     stage: Stage
+    selected_stages: list[LifecycleStage]
     scope: str | None
     proposed_evidence: list[EvidenceResponse]
     confirmed_evidence: list[EvidenceResponse]
@@ -150,6 +223,7 @@ class InterviewSessionResponse(StrictModel):
     created_at: datetime
     updated_at: datetime
     expires_at: datetime
+
 
 class SuggestedEvidence(StrictModel):
     id: str = Field(min_length=1, max_length=128)
@@ -162,8 +236,14 @@ class InterviewReply(StrictModel):
     question: str = Field(min_length=1, max_length=2000)
     stage: Stage
     evidence: list[SuggestedEvidence] = Field(max_length=50)
-    proposed_scope: str | None = Field(default=None, max_length=256)
+    proposed_scope: str | None = Field(
+        default=None,
+        max_length=256,
+        pattern=WORKFLOW_ID_PATTERN,
+    )
     ready_for_review: bool
+    options: list[InterviewOption] = Field(default_factory=list, max_length=6)
+    allow_custom_answer: Literal[True] = True
 
     @field_validator("question")
     @classmethod
@@ -171,6 +251,20 @@ class InterviewReply(StrictModel):
         if value.count("?") > 1:
             raise ValueError("question must contain at most one question")
         return value
+
+    @field_validator("options")
+    @classmethod
+    def require_unique_option_ids(
+        cls, value: list[InterviewOption]
+    ) -> list[InterviewOption]:
+        ids = [option.id for option in value]
+        if len(ids) != len(set(ids)):
+            raise ValueError("option IDs must be unique")
+        return value
+
+
+class WireInterviewReply(InterviewReply):
+    allow_custom_answer: Literal[True]
 
 
 class SdlcStage(StrictModel):
@@ -186,6 +280,11 @@ class DeclaredSystem(StrictModel):
     capabilities: list[str] = Field(min_length=1)
 
 
+class WireDeclaredSystem(DeclaredSystem):
+    tool: SystemTool
+    capabilities: list[MachineId] = Field(min_length=1)
+
+
 class IssueTracker(StrictModel):
     system_id: str = Field(pattern=r"^[a-z][a-z0-9-]*$")
     provider: Literal["markdown", "github", "jira"]
@@ -195,6 +294,31 @@ class IssueTracker(StrictModel):
     skill: str | None
     mcp: str | None
     capabilities: list[str] = Field(min_length=1)
+
+
+class WireMarkdownIssueTracker(StrictModel):
+    system_id: MachineId
+    provider: Literal["markdown"]
+    connection: Literal["local"]
+    project: str = Field(pattern=MARKDOWN_PROJECT_PATTERN)
+    path: str = Field(min_length=1)
+    skill: None
+    mcp: None
+    capabilities: list[TrackerCapability] = Field(min_length=1)
+
+
+class WireRemoteIssueTracker(StrictModel):
+    system_id: MachineId
+    provider: Literal["github", "jira"]
+    connection: Literal["skill", "mcp"]
+    project: str = Field(pattern=REMOTE_PROJECT_PATTERN)
+    path: None
+    skill: MachineId | None
+    mcp: McpConnector | None
+    capabilities: list[TrackerCapability] = Field(min_length=1)
+
+
+WireIssueTracker = WireMarkdownIssueTracker | WireRemoteIssueTracker
 
 
 class Pain(StrictModel):
@@ -233,6 +357,8 @@ class GlossaryEntry(StrictModel):
 
 class WireDraftProfile(DraftProfile):
     glossary: list[GlossaryEntry]
+    systems: list[WireDeclaredSystem]
+    issue_tracker: WireIssueTracker
 
     @model_validator(mode="after")
     def require_unique_glossary_terms(self) -> "WireDraftProfile":
@@ -265,15 +391,28 @@ class WorkflowStep(StrictModel):
     manual: ManualHandoff | None
 
 
+class WireWorkflowStep(WorkflowStep):
+    needs: list[MachineId]
+    inputs: list[MachineId]
+    outputs: list[MachineId]
+    tools: list[ToolBinding]
+    approval_timing: Literal["before", "after"]
+
+
 class TraceabilityEntry(StrictModel):
     requirement: str = Field(min_length=1)
     steps: list[str]
     checks: list[str]
 
 
+class WireTraceabilityEntry(TraceabilityEntry):
+    steps: list[MachineId] = Field(min_length=1)
+    checks: list[str] = Field(min_length=1)
+
+
 class DraftWorkflow(StrictModel):
     schema_version: Literal[1]
-    id: str = Field(pattern=r"^[a-z][a-z0-9-]*$")
+    id: str = Field(pattern=WORKFLOW_ID_PATTERN)
     name: str = Field(min_length=1)
     customer_id: str = Field(pattern=r"^[a-z][a-z0-9-]*$")
     goal: str = Field(min_length=1)
@@ -283,6 +422,13 @@ class DraftWorkflow(StrictModel):
     customer_rules: list[str]
     steps: list[WorkflowStep] = Field(min_length=1)
     traceability: list[TraceabilityEntry]
+
+
+class WireDraftWorkflow(DraftWorkflow):
+    inputs: list[MachineId] = Field(min_length=1)
+    outputs: list[MachineId] = Field(min_length=1)
+    steps: list[WireWorkflowStep] = Field(min_length=1)
+    traceability: list[WireTraceabilityEntry] = Field(min_length=1)
 
 
 class Scenario(StrictModel):
@@ -316,7 +462,7 @@ class DraftCandidate(StrictModel):
 
 class WireDraftCandidate(StrictModel):
     profile: WireDraftProfile
-    workflow: DraftWorkflow
+    workflow: WireDraftWorkflow
     scenarios: DraftScenarios
 
     def to_canonical(self) -> DraftCandidate:

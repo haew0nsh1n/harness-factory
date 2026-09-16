@@ -1,0 +1,175 @@
+.review {
+  display: grid;
+  gap: 1rem;
+}
+
+.document {
+  overflow: hidden;
+  padding: 0;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--hf-border);
+}
+
+.header p,
+.header h2 {
+  margin: 0;
+}
+
+.identifier {
+  color: var(--hf-muted);
+  font-family: var(--hf-mono);
+  font-size: 0.75rem;
+}
+
+.body {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.lead {
+  max-width: 74ch;
+  margin: 0;
+  color: var(--hf-ink);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.6rem;
+  margin: 0;
+}
+
+.facts div {
+  padding: 0.75rem;
+  border-left: 3px solid var(--hf-action);
+  background: var(--hf-canvas);
+}
+
+.facts dt {
+  color: var(--hf-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.facts dd {
+  margin: 0.25rem 0 0;
+  line-height: 1.5;
+}
+
+.group {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.group h3 {
+  margin: 0;
+  color: var(--hf-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.list,
+.stepList {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  line-height: 1.55;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+}
+
+.card,
+.step {
+  padding: 0.85rem;
+  border: 1px solid var(--hf-border);
+  border-radius: 0.35rem;
+  background: var(--hf-canvas);
+}
+
+.card h4,
+.step h4 {
+  margin: 0;
+  font-family: var(--hf-display);
+  font-size: 0.95rem;
+}
+
+.card p,
+.step p {
+  margin: 0.45rem 0 0;
+  line-height: 1.5;
+}
+
+.meta {
+  color: var(--hf-muted);
+  font-size: 0.78rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+
+.chip {
+  border: 1px solid var(--hf-border);
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+  background: var(--hf-surface);
+  color: var(--hf-muted);
+  font-family: var(--hf-mono);
+  font-size: 0.7rem;
+}
+
+.stepList {
+  counter-reset: review-step;
+}
+
+.step {
+  position: relative;
+  padding-left: 3.4rem;
+}
+
+.step::before {
+  counter-increment: review-step;
+  content: counter(review-step, decimal-leading-zero);
+  position: absolute;
+  top: 0.85rem;
+  left: 0.85rem;
+  color: var(--hf-action);
+  font: 700 0.78rem/1 var(--hf-mono);
+}
+
+.warning {
+  border-left: 3px solid var(--hf-warning-fg);
+  padding-left: 0.75rem;
+}
+
+@media (max-width: 560px) {
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}

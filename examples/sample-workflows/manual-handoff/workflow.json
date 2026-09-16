@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "manual-handoff",
+  "name": "리뷰 후 수동 PR 인계",
+  "customer_id": "fictional-manual-handoff",
+  "goal": "리뷰된 변경의 게시 권한을 human maintainer에게 유지하고 명확한 재개 증거를 받는다.",
+  "trigger": "중요한 미해결 결함이 없는 review-report가 전달된다.",
+  "inputs": ["review-report"],
+  "outputs": ["pr-url"],
+  "customer_rules": [
+    "maintainer가 실제 review-report를 확인하고 사전 승인하기 전에는 수동 절차를 시작하지 않는다.",
+    "agent는 PR 생성, push, merge, release 또는 deploy를 자동 수행하지 않는다.",
+    "수동 작업 결과가 불확실하면 자동 재시도하지 않고 기존 PR을 먼저 확인한다.",
+    "PR URL과 reviewed change의 일치 확인 없이는 완료를 주장하지 않는다."
+  ],
+  "approved": {"by": "fictional-fixture-author-not-customer-approval", "at": "2026-09-16T00:00:00+09:00"},
+  "steps": [
+    {
+      "id": "handoff",
+      "name": "maintainer에게 PR 게시 인계",
+      "skill": "hf-manual",
+      "needs": [],
+      "inputs": ["review-report"],
+      "outputs": ["pr-url"],
+      "tools": [],
+      "effect": "manual",
+      "approval": true,
+      "approval_timing": "before",
+      "approver": "maintainer",
+      "completion": "maintainer가 PR URL과 그것이 reviewed change에 대응한다는 확인을 재개 증거로 제공하고, 원격 상태는 미검증이라고 명시한다.",
+      "failure": "URL이 없거나 작업 결과가 불확실하면 awaiting-manual 또는 uncertain 상태를 유지하고 새 PR 생성을 요청하지 않는다.",
+      "manual": {
+        "owner": "maintainer",
+        "instructions": "실제 review-report와 변경을 확인하고 명시적으로 승인한 뒤 조직의 기존 절차로 branch를 게시하고 PR을 생성하세요. agent에게 credential을 제공하지 말고 완료 후 PR URL과 reviewed change가 동일하다는 확인을 전달하세요.",
+        "resume_when": "maintainer가 PR URL과 reviewed change가 동일하다는 확인을 제공한다. 이 fixture에는 원격 읽기 연결이 없으므로 live verification은 미확인으로 기록한다."
+      }
+    }
+  ],
+  "traceability": [
+    {"requirement": "게시 권한을 human maintainer에게 유지한다.", "steps": ["handoff"], "checks": ["수동 작업 전에 maintainer 승인이 필요하다.", "agent는 PR, merge, release 또는 deploy를 실행하지 않는다."]},
+    {"requirement": "재개 증거 없이 완료하지 않는다.", "steps": ["handoff"], "checks": ["PR URL과 reviewed change 확인이 모두 필요하다.", "불확실한 생성 결과는 자동 재시도하지 않는다."]}
+  ]
+}

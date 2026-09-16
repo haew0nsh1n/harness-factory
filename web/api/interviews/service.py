@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
@@ -25,9 +26,11 @@ from .models import (
 from .operations import (
     OperationClaimConflict,
     claim_session_operation,
+    operation_lease_expired,
     reclaim_operation,
+    session_operation_lease_expired,
 )
-from .privacy import reject_recognizable_secrets
+from .privacy import SecretDetected, reject_recognizable_secrets
 from .schemas import (
     AnswerRequest,
     ConfirmationRequest,
@@ -35,6 +38,7 @@ from .schemas import (
     InterviewSessionResponse,
     StartInterviewRequest,
 )
+from .stages import canonical_stages, stored_stages
 
 
 @dataclass
@@ -89,14 +93,17 @@ class InterviewService:
     ) -> tuple[InterviewSessionResponse, bool]:
         reject_recognizable_secrets(request.name, request.customer_id)
         request_id = str(request.request_id)
-        input_digest = _digest(
-            {
-                "kind": "start",
-                "name": request.name,
-                "customer_id": request.customer_id,
-                "consent_version": request.consent_version,
-            }
-        )
+        digest_input: dict[str, object] = {
+            "kind": "start",
+            "name": request.name,
+            "customer_id": request.customer_id,
+            "consent_version": request.consent_version,
+        }
+        if "selected_stages" in request.model_fields_set:
+            digest_input["selected_stages"] = list(
+                canonical_stages(request.selected_stages)
+            )
+        input_digest = _digest(digest_input)
         created = False
         try:
             session_id, token, should_call = self._claim_start(
@@ -114,13 +121,15 @@ class InterviewService:
         if not should_call:
             return self.get(actor, session_id), False
 
+        selected_stages = canonical_stages(request.selected_stages)
         context = InterviewContext(
             session_id=session_id,
             revision=0,
             turns=(),
             confirmed_evidence=(),
-            stage="discovery",
+            stage=selected_stages[0],
             selected_scope=None,
+            selected_stages=selected_stages,
         )
         await self._run_model_operation(
             actor.organization_id,
@@ -142,6 +151,7 @@ class InterviewService:
         now = _utcnow()
         session_id = str(uuid4())
         token = str(uuid4())
+        selected_stages = canonical_stages(request.selected_stages)
         with self._session_factory.begin() as db:
             session = InterviewSession(
                 id=session_id,
@@ -153,8 +163,13 @@ class InterviewService:
                 status="active",
                 consent_version=request.consent_version,
                 consented_at=now,
-                stage="discovery",
+                stage=selected_stages[0],
                 selected_scope=None,
+                selected_stages_json=(
+                    list(selected_stages)
+                    if "selected_stages" in request.model_fields_set
+                    else None
+                ),
                 proposed_evidence_json=[],
                 confirmed_evidence_json=[],
                 creation_request_id=request_id,
@@ -221,15 +236,21 @@ class InterviewService:
     async def answer(
         self, actor: Actor, session_id: str, request: AnswerRequest
     ) -> InterviewSessionResponse:
-        reject_recognizable_secrets(request.answer)
+        if request.answer is not None:
+            reject_recognizable_secrets(request.answer)
         request_id = str(request.request_id)
-        input_digest = _digest(
-            {
-                "kind": "answer",
-                "expected_revision": request.expected_revision,
-                "answer": request.answer,
-            }
-        )
+        digest_input: dict[str, object] = {
+            "kind": "answer",
+            "expected_revision": request.expected_revision,
+        }
+        if request.answer is not None:
+            digest_input["answer"] = request.answer
+        else:
+            assert request.choice_answer is not None
+            digest_input["choice_answer"] = request.choice_answer.model_dump(
+                mode="json"
+            )
+        input_digest = _digest(digest_input)
         token, context, should_call = self._claim_answer(
             actor,
             session_id,
@@ -303,6 +324,47 @@ class InterviewService:
                     "turn_limit", "interview turn limit has been reached"
                 )
 
+            answer_text = request.answer
+            choice_question_turn_id: str | None = None
+            choice_option_id: str | None = None
+            if request.choice_answer is not None:
+                question = db.scalar(
+                    select(StoredTurn)
+                    .where(
+                        StoredTurn.organization_id == actor.organization_id,
+                        StoredTurn.session_id == session_id,
+                        StoredTurn.role == "assistant",
+                    )
+                    .order_by(StoredTurn.sequence.desc())
+                    .limit(1)
+                )
+                if (
+                    question is None
+                    or question.id != str(request.choice_answer.question_turn_id)
+                ):
+                    raise InterviewConflict(
+                        "choice_question_not_current",
+                        "choice question is not the latest answerable question",
+                    )
+                options = question.options_json or []
+                selected = next(
+                    (
+                        option
+                        for option in options
+                        if option.get("id") == request.choice_answer.option_id
+                    ),
+                    None,
+                )
+                if selected is None:
+                    raise InterviewConflict(
+                        "choice_option_not_found",
+                        "choice option was not found on the question",
+                    )
+                answer_text = str(selected["label"])
+                reject_recognizable_secrets(answer_text)
+                choice_question_turn_id = question.id
+                choice_option_id = request.choice_answer.option_id
+            assert answer_text is not None
             token = str(uuid4())
             lease_expires_at = self._lease_expiry(now)
             self._claim_session_operation(
@@ -339,7 +401,11 @@ class InterviewService:
                     operation_id=operation.id,
                     sequence=int(turn_count or 0) + 1,
                     role="user",
-                    text=request.answer,
+                    text=answer_text,
+                    options_json=None,
+                    allow_custom_answer=None,
+                    choice_question_turn_id=choice_question_turn_id,
+                    choice_option_id=choice_option_id,
                     created_at=now,
                 )
             )
@@ -356,7 +422,21 @@ class InterviewService:
         context: InterviewContext,
     ) -> None:
         try:
-            reply = await self._model.next_question(context)
+            raw_reply = await self._model.next_question(context)
+            reply = InterviewReply.model_validate(raw_reply)
+        except PydanticValidationError:
+            recorded = self._record_failure(
+                organization_id,
+                session_id,
+                request_id,
+                token,
+                "llm_invalid_result",
+            )
+            if not recorded:
+                raise InterviewConflict(
+                    "operation_superseded", "interview operation was superseded"
+                ) from None
+            raise InterviewInferenceFailure("llm_invalid_result") from None
         except InterviewModelError as exc:
             recorded = self._record_failure(
                 organization_id, session_id, request_id, token, exc.code
@@ -366,12 +446,23 @@ class InterviewService:
                     "operation_superseded", "interview operation was superseded"
                 ) from None
             raise InterviewInferenceFailure(exc.code) from None
-        turn_ids = {turn.id for turn in context.turns}
+        selected_stages = set(context.selected_stages)
+        invalid_stage = reply.stage not in selected_stages and not (
+            reply.stage == "summary" and reply.ready_for_review
+        )
+        if not context.turns and reply.stage != context.selected_stages[0]:
+            invalid_stage = True
+        turn_by_id = {turn.id: turn for turn in context.turns}
         if any(
-            source_id not in turn_ids
+            source_id not in turn_by_id
             for evidence in reply.evidence
             for source_id in evidence.source_turn_ids
-        ):
+        ) or any(
+            turn_by_id[source_id].role != "user"
+            for evidence in reply.evidence
+            for source_id in evidence.source_turn_ids
+            if source_id in turn_by_id
+        ) or invalid_stage:
             recorded = self._record_failure(
                 organization_id,
                 session_id,
@@ -384,6 +475,23 @@ class InterviewService:
                     "operation_superseded", "interview operation was superseded"
                 )
             raise InterviewInferenceFailure("llm_invalid_result")
+        try:
+            reject_recognizable_secrets(
+                *(option.label for option in reply.options)
+            )
+        except SecretDetected:
+            recorded = self._record_failure(
+                organization_id,
+                session_id,
+                request_id,
+                token,
+                "secret_detected",
+            )
+            if not recorded:
+                raise InterviewConflict(
+                    "operation_superseded", "interview operation was superseded"
+                ) from None
+            raise
         self._finish_operation(
             organization_id,
             session_id,
@@ -483,6 +591,12 @@ class InterviewService:
                     sequence=int(turn_count or 0) + 1,
                     role="assistant",
                     text=reply.question,
+                    options_json=[
+                        option.model_dump(mode="json") for option in reply.options
+                    ],
+                    allow_custom_answer=reply.allow_custom_answer,
+                    choice_question_turn_id=None,
+                    choice_option_id=None,
                     created_at=now,
                 )
             )
@@ -743,7 +857,19 @@ class InterviewService:
             session_id=session.id,
             revision=session.revision,
             turns=tuple(
-                InterviewTurn(id=turn.id, role=turn.role, text=turn.text)
+                InterviewTurn(
+                    id=turn.id,
+                    role=turn.role,
+                    text=turn.text,
+                    options=tuple(turn.options_json or []),
+                    allow_custom_answer=(
+                        True
+                        if turn.allow_custom_answer is None
+                        else turn.allow_custom_answer
+                    ),
+                    choice_question_turn_id=turn.choice_question_turn_id,
+                    choice_option_id=turn.choice_option_id,
+                )
                 for turn in turns
             ),
             confirmed_evidence=tuple(
@@ -758,6 +884,7 @@ class InterviewService:
             ),
             stage=session.stage,
             selected_scope=session.selected_scope,
+            selected_stages=stored_stages(session.selected_stages_json),
         )
 
     def _snapshot(
@@ -781,10 +908,25 @@ class InterviewService:
         ).all()
         last_operation = None
         if session.last_operation_request_id is not None:
+            operation = db.scalar(
+                select(InterviewOperation).where(
+                    InterviewOperation.organization_id
+                    == session.organization_id,
+                    InterviewOperation.session_id == session.id,
+                    InterviewOperation.request_id
+                    == session.last_operation_request_id,
+                )
+            )
+            now = _utcnow()
             last_operation = {
                 "request_id": session.last_operation_request_id,
                 "kind": session.last_operation_kind,
                 "status": session.last_operation_status,
+                "lease_expired": (
+                    operation is not None
+                    and session_operation_lease_expired(session, now=now)
+                    and operation_lease_expired(operation, now=now)
+                ),
             }
         return InterviewSessionResponse.model_validate(
             {
@@ -798,6 +940,9 @@ class InterviewService:
                 "consent_version": session.consent_version,
                 "consented_at": _aware(session.consented_at),
                 "stage": session.stage,
+                "selected_stages": list(
+                    stored_stages(session.selected_stages_json)
+                ),
                 "scope": session.selected_scope,
                 "proposed_evidence": session.proposed_evidence_json,
                 "confirmed_evidence": session.confirmed_evidence_json,
@@ -808,6 +953,14 @@ class InterviewService:
                         "text": turn.text,
                         "sequence": turn.sequence,
                         "created_at": _aware(turn.created_at),
+                        "options": turn.options_json or [],
+                        "allow_custom_answer": (
+                            True
+                            if turn.allow_custom_answer is None
+                            else turn.allow_custom_answer
+                        ),
+                        "choice_question_turn_id": turn.choice_question_turn_id,
+                        "choice_option_id": turn.choice_option_id,
                     }
                     for turn in turns
                 ],

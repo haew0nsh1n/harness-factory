@@ -19,6 +19,36 @@ def _matches(column, value):
     return column.is_(None) if value is None else column == value
 
 
+def session_operation_lease_expired(
+    session: InterviewSession, *, now: datetime
+) -> bool:
+    return (
+        session.last_operation_status == "running"
+        and (
+            session.last_operation_lease_expires_at is None
+            or _aware(session.last_operation_lease_expires_at) <= now
+        )
+    )
+
+
+def session_operation_is_live(
+    session: InterviewSession, *, now: datetime
+) -> bool:
+    return (
+        session.last_operation_status == "running"
+        and not session_operation_lease_expired(session, now=now)
+    )
+
+
+def operation_lease_expired(
+    operation: InterviewOperation, *, now: datetime
+) -> bool:
+    return (
+        operation.status == "running"
+        and _aware(operation.lease_expires_at) <= now
+    )
+
+
 def claim_session_operation(
     db: Session,
     session: InterviewSession,
@@ -31,11 +61,7 @@ def claim_session_operation(
     retention_expires_at: datetime,
     now: datetime,
 ) -> None:
-    if (
-        session.last_operation_status == "running"
-        and session.last_operation_lease_expires_at is not None
-        and _aware(session.last_operation_lease_expires_at) > now
-    ):
+    if session_operation_is_live(session, now=now):
         raise OperationClaimConflict()
 
     claimed = db.execute(
@@ -97,11 +123,7 @@ def advance_session_without_live_operation(
     retention_expires_at: datetime,
     now: datetime,
 ) -> None:
-    if (
-        session.last_operation_status == "running"
-        and session.last_operation_lease_expires_at is not None
-        and _aware(session.last_operation_lease_expires_at) > now
-    ):
+    if session_operation_is_live(session, now=now):
         raise OperationClaimConflict()
 
     advanced = db.execute(
@@ -166,7 +188,9 @@ def reclaim_operation(
     now: datetime,
     claim: Callable[..., None] = claim_session_operation,
 ) -> None:
-    if operation.status == "running" and _aware(operation.lease_expires_at) > now:
+    if operation.status == "running" and not operation_lease_expired(
+        operation, now=now
+    ):
         raise OperationClaimConflict()
     previous_status = operation.status
     previous_token = operation.ownership_token

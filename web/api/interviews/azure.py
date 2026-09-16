@@ -30,7 +30,12 @@ from .prompts import (
     context_input,
     draft_input,
 )
-from .schemas import DraftCandidate, InterviewReply, WireDraftCandidate
+from .schemas import (
+    DraftCandidate,
+    InterviewReply,
+    WireDraftCandidate,
+    WireInterviewReply,
+)
 
 
 AZURE_COGNITIVE_SCOPE = "https://cognitiveservices.azure.com/.default"
@@ -72,12 +77,13 @@ class AzureOpenAIInterviewModel:
         self._validate_assembled_input(INTERVIEW_INSTRUCTIONS, input_text)
 
         async def operation() -> InterviewReply:
-            result = await self._parse(
-                text_format=InterviewReply,
+            wire_result = await self._parse(
+                text_format=WireInterviewReply,
                 instructions=INTERVIEW_INSTRUCTIONS,
                 input_text=input_text,
                 max_output_tokens=TURN_OUTPUT_TOKENS,
             )
+            result = InterviewReply.model_validate(wire_result.model_dump())
             turn_ids = {turn.id for turn in context.turns}
             if any(
                 source_id not in turn_ids
@@ -105,6 +111,8 @@ class AzureOpenAIInterviewModel:
                 instructions=DRAFT_INSTRUCTIONS,
                 input_text=input_text,
                 max_output_tokens=DRAFT_OUTPUT_TOKENS,
+                reasoning_effort="low",
+                verbosity="low",
             )
             try:
                 result = wire_result.to_canonical()
@@ -185,17 +193,26 @@ class AzureOpenAIInterviewModel:
         instructions: str,
         input_text: str,
         max_output_tokens: int,
+        reasoning_effort: str | None = None,
+        verbosity: str | None = None,
     ) -> T:
         client = await self._get_client()
         for attempt in range(2):
             try:
+                request_options: dict[str, object] = {
+                    "model": self._settings.azure_openai_deployment,
+                    "instructions": instructions,
+                    "input": input_text,
+                    "text_format": text_format,
+                    "max_output_tokens": max_output_tokens,
+                    "store": False,
+                }
+                if reasoning_effort is not None:
+                    request_options["reasoning"] = {"effort": reasoning_effort}
+                if verbosity is not None:
+                    request_options["text"] = {"verbosity": verbosity}
                 response = await client.responses.parse(
-                    model=self._settings.azure_openai_deployment,
-                    instructions=instructions,
-                    input=input_text,
-                    text_format=text_format,
-                    max_output_tokens=max_output_tokens,
-                    store=False,
+                    **request_options,
                 )
             except (CredentialUnavailableError, ClientAuthenticationError) as exc:
                 raise InterviewModelError(

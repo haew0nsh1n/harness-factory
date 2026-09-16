@@ -4,13 +4,28 @@ export interface StartOperationEnvelope {
   customer_id: string;
   consent_version: "2026-09-15";
   consent_accepted: true;
+  selected_stages: string[];
 }
 
-export interface AnswerOperationEnvelope {
+interface BaseAnswerOperationEnvelope {
   request_id: string;
   expected_revision: number;
+}
+
+export interface TextAnswerOperationEnvelope extends BaseAnswerOperationEnvelope {
   answer: string;
 }
+
+export interface ChoiceAnswerOperationEnvelope extends BaseAnswerOperationEnvelope {
+  choice_answer: {
+    question_turn_id: string;
+    option_id: string;
+  };
+}
+
+export type AnswerOperationEnvelope =
+  | TextAnswerOperationEnvelope
+  | ChoiceAnswerOperationEnvelope;
 
 export interface ProposalOperationEnvelope {
   request_id: string;

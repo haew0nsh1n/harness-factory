@@ -16,12 +16,66 @@ from web.api.designs.models import (
     Approval,
 )
 from web.api.identity.models import Actor
+from web.api.interviews.schemas import (
+    DraftCandidate,
+    InterviewReply,
+    SuggestedEvidence,
+)
 from web.api.main import create_app
 from web.api.organizations.bootstrap import bootstrap_development_tenant
 
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_NAME = "Existing synthetic design"
+
+
+class ReviewOnlyFixtureModel(StructuredFakeInterviewModel):
+    async def next_question(self, context):
+        self.question_calls += 1
+        if not context.turns:
+            return InterviewReply(
+                question="검토 단계에서 가장 큰 병목은 무엇인가요?",
+                stage="review",
+                evidence=[],
+                proposed_scope=None,
+                ready_for_review=False,
+                options=[
+                    {"id": "unclear-criteria", "label": "불명확한 검토 기준"},
+                    {"id": "approval-wait", "label": "승인 대기"},
+                    {"id": "manual-handoff", "label": "수동 인계"},
+                ],
+                allow_custom_answer=True,
+            )
+        return InterviewReply(
+            question="이 검토 워크플로 범위로 진행할까요?",
+            stage="summary",
+            evidence=[
+                SuggestedEvidence(
+                    id="fixture-review-bottleneck",
+                    statement=(
+                        f"검토 단계의 병목으로 '{context.turns[-1].text}'을(를) "
+                        "선택했습니다."
+                    ),
+                    kind="fact",
+                    source_turn_ids=[context.turns[-1].id],
+                )
+            ],
+            proposed_scope="issue-to-reviewed-pr",
+            ready_for_review=True,
+            options=[
+                {"id": "continue", "label": "이 범위로 계속"},
+                {"id": "refine", "label": "범위를 더 구체화"},
+            ],
+            allow_custom_answer=True,
+        )
+
+    async def propose_design(self, context, catalog):
+        candidate = await super().propose_design(context, catalog)
+        value = candidate.model_dump()
+        value["profile"]["sdlc"] = [
+            item for item in value["profile"]["sdlc"] if item["stage"] == "review"
+        ]
+        return DraftCandidate.model_validate(value)
 
 
 def create_integration_app():
@@ -37,7 +91,7 @@ def create_integration_app():
     )
     app = create_app(
         settings,
-        interview_model_factory=lambda _: StructuredFakeInterviewModel(
+        interview_model_factory=lambda _: ReviewOnlyFixtureModel(
             ROOT / "examples"
         ),
     )

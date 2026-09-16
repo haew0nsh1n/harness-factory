@@ -700,6 +700,139 @@ def test_alembic_0007_preserves_existing_accepted_proposal_link(
         get_settings.cache_clear()
 
 
+def test_alembic_0008_preserves_populated_interviews_and_downgrades(
+    monkeypatch, tmp_path
+):
+    database_path = tmp_path / "interview-choice-migration.db"
+    database_url = f"sqlite+pysqlite:///{database_path}"
+    config = create_alembic_config(database_url)
+    now = datetime.now(UTC)
+
+    monkeypatch.setenv("HF_DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    try:
+        command.upgrade(config, "0007_proposal_design_fk")
+        engine = create_engine(database_url)
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO organizations (id, entra_tenant_id, name)
+                    VALUES ('org-acme', 'tenant-acme', 'Acme')
+                    """
+                )
+            )
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO interview_sessions (
+                        id, organization_id, owner_subject_id, name, customer_id,
+                        revision, status, consent_version, consented_at, stage,
+                        selected_scope, proposed_evidence_json,
+                        confirmed_evidence_json, creation_request_id,
+                        creation_input_digest, created_at, updated_at, expires_at
+                    ) VALUES (
+                        'session-1', 'org-acme', 'author-1', 'Interview',
+                        'customer-1', 1, 'active', '2026-09-15', :now,
+                        'review', NULL, '[]', '[]', 'creation-request-1',
+                        :digest, :now, :now, :expires
+                    )
+                    """
+                ),
+                {
+                    "digest": "a" * 64,
+                    "now": now,
+                    "expires": now + timedelta(days=1),
+                },
+            )
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO interview_operations (
+                        id, organization_id, session_id, request_id, kind,
+                        input_digest, status, ownership_token, base_revision,
+                        lease_expires_at, created_at, updated_at
+                    ) VALUES (
+                        'operation-1', 'org-acme', 'session-1', 'request-1',
+                        'start', :digest, 'succeeded', 'token-1', 0,
+                        :expires, :now, :now
+                    )
+                    """
+                ),
+                {
+                    "digest": "b" * 64,
+                    "now": now,
+                    "expires": now + timedelta(days=1),
+                },
+            )
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO interview_turns (
+                        id, organization_id, session_id, operation_id, sequence,
+                        role, text, created_at
+                    ) VALUES (
+                        'turn-1', 'org-acme', 'session-1', 'operation-1', 1,
+                        'assistant', '기존 질문', :now
+                    )
+                    """
+                ),
+                {"now": now},
+            )
+        engine.dispose()
+
+        command.upgrade(config, "head")
+        engine = create_engine(database_url)
+        inspector = inspect(engine)
+        assert {
+            "selected_stages_json",
+        }.issubset(
+            {column["name"] for column in inspector.get_columns("interview_sessions")}
+        )
+        assert {
+            "options_json",
+            "allow_custom_answer",
+            "choice_question_turn_id",
+            "choice_option_id",
+        }.issubset(
+            {column["name"] for column in inspector.get_columns("interview_turns")}
+        )
+        with engine.begin() as connection:
+            row = connection.execute(
+                text(
+                    """
+                    SELECT selected_stages_json, text, options_json,
+                           allow_custom_answer, choice_question_turn_id,
+                           choice_option_id
+                    FROM interview_sessions
+                    JOIN interview_turns ON interview_turns.session_id =
+                        interview_sessions.id
+                    WHERE interview_sessions.id = 'session-1'
+                    """
+                )
+            ).one()
+            assert row == (None, "기존 질문", None, None, None, None)
+        engine.dispose()
+
+        command.downgrade(config, "0007_proposal_design_fk")
+        engine = create_engine(database_url)
+        inspector = inspect(engine)
+        assert "selected_stages_json" not in {
+            column["name"] for column in inspector.get_columns("interview_sessions")
+        }
+        assert "options_json" not in {
+            column["name"] for column in inspector.get_columns("interview_turns")
+        }
+        with engine.begin() as connection:
+            assert connection.scalar(
+                text("SELECT text FROM interview_turns WHERE id = 'turn-1'")
+            ) == "기존 질문"
+        engine.dispose()
+    finally:
+        get_settings.cache_clear()
+
+
 def test_alembic_upgrade_from_0002_collapses_duplicate_build_job_identities(
     monkeypatch, tmp_path
 ):

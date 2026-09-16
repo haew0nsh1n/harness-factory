@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { InterviewPageContent } from "@/components/studio/InterviewPageContent";
 import type { InterviewSession } from "@/lib/types";
@@ -141,6 +141,7 @@ function installLoadedSession(
 
 describe("InterviewPageContent lifecycle", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     window.sessionStorage.clear();
   });
@@ -155,6 +156,7 @@ describe("InterviewPageContent lifecycle", () => {
         503,
       );
     });
+
     render(<InterviewPageContent />);
 
     fireEvent.change(screen.getByLabelText("인터뷰 이름"), {
@@ -180,6 +182,29 @@ describe("InterviewPageContent lifecycle", () => {
     await waitFor(() => expect(bodies).toHaveLength(3));
     expect(bodies[2]?.request_id).not.toBe(bodies[0]?.request_id);
     expect(bodies[2]?.name).toBe("변경한 인터뷰");
+  });
+
+  test("sends the default stage subset, prevents an empty subset, and changes the start request for a new subset", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    installFetch((path, init) => {
+      expect(path).toBe("/api/control-plane/interviews");
+      bodies.push(JSON.parse(String(init?.body)));
+      return response({ ok: false, code: "llm_timeout", error: "timed out" }, 503);
+    });
+    render(<InterviewPageContent />);
+    fireEvent.change(screen.getByLabelText("인터뷰 이름"), { target: { value: "단계 선택" } });
+    fireEvent.change(screen.getByLabelText("고객 ID"), { target: { value: "acme" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Azure OpenAI/ }));
+    fireEvent.click(screen.getByRole("button", { name: "인터뷰 시작" }));
+    await screen.findByRole("alert");
+    expect(bodies[0]?.selected_stages).toEqual(["planning", "implementation", "review"]);
+    fireEvent.click(screen.getByRole("button", { name: "선택 해제" }));
+    expect(screen.getByRole("button", { name: "인터뷰 시작" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("checkbox", { name: "발견" }));
+    fireEvent.click(screen.getByRole("button", { name: "인터뷰 시작" }));
+    await waitFor(() => expect(bodies).toHaveLength(2));
+    expect(bodies[1]).toMatchObject({ selected_stages: ["discovery"] });
+    expect(bodies[1]?.request_id).not.toBe(bodies[0]?.request_id);
   });
 
   test("shows interview API failures in Korean instead of exposing English server copy", async () => {
@@ -212,6 +237,40 @@ describe("InterviewPageContent lifecycle", () => {
     );
   });
 
+  test("advises continuing the interview when a persisted scope is malformed", async () => {
+    installFetch((path, init) => {
+      if (path === "/api/control-plane/interviews/interview-1") {
+        return response({ ok: true, session });
+      }
+      if (path === "/api/control-plane/designs") {
+        return response({ ok: true, items: [] });
+      }
+      if (path.endsWith("/proposals") && init?.method === "POST") {
+        return response(
+          {
+            ok: false,
+            code: "scope_invalid",
+            error: "selected scope is not a canonical workflow ID",
+          },
+          409,
+        );
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    render(<InterviewPageContent interviewId="interview-1" />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "설계 제안 생성" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "인터뷰를 계속해 새 워크플로 범위를 확정",
+    );
+    expect(screen.getByRole("alert")).not.toHaveTextContent(
+      "selected scope is not a canonical workflow ID",
+    );
+  });
+
   test("retries the immutable answer envelope and uses a new id for edited input", async () => {
     const answerBodies: Array<Record<string, unknown>> = [];
     installFetch((path, init) => {
@@ -228,6 +287,7 @@ describe("InterviewPageContent lifecycle", () => {
             ok: true,
             session: { ...session, revision: 3 },
           });
+
         }
         return response(
           { ok: false, code: "llm_timeout", error: "timed out" },
@@ -256,6 +316,262 @@ describe("InterviewPageContent lifecycle", () => {
       expected_revision: 3,
       answer: "새 답변",
     });
+  });
+
+  test("sends an AI suggestion only after explicit submission and preserves its immutable retry", async () => {
+    const answerBodies: Array<Record<string, unknown>> = [];
+    const suggested = {
+      ...session,
+      turns: [{
+        ...session.turns[0],
+        options: [{ id: "review-first", label: "리뷰 기준을 먼저 합의합니다." }],
+        allow_custom_answer: true,
+      }],
+    };
+    installFetch((path, init) => {
+      if (path === "/api/control-plane/interviews/interview-1") return response({ ok: true, session: suggested });
+      if (path === "/api/control-plane/designs") return response({ ok: true, items: [] });
+      if (path.endsWith("/turns")) {
+        answerBodies.push(JSON.parse(String(init?.body)));
+        return response({ ok: false, code: "llm_timeout", error: "timed out" }, 503);
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    render(<InterviewPageContent interviewId="interview-1" />);
+    fireEvent.click(await screen.findByRole("radio", { name: "리뷰 기준을 먼저 합의합니다." }));
+    expect(answerBodies).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "답변 보내기" }));
+    await screen.findByRole("alert");
+    expect(answerBodies[0]).toEqual({
+      expected_revision: 2,
+      request_id: expect.any(String),
+      choice_answer: { question_turn_id: "turn-assistant", option_id: "review-first" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "저장된 요청 다시 시도" }));
+    await waitFor(() => expect(answerBodies).toHaveLength(2));
+    expect(answerBodies[1]).toEqual(answerBodies[0]);
+  });
+
+  test("shows persisted in-progress work and disables all confirmation controls", async () => {
+    installLoadedSession({
+      ...session,
+      selected_stages: ["planning", "review"],
+      proposed_evidence: [
+        {
+          id: "evidence-1",
+          statement: "검토 기준을 확인합니다.",
+          kind: "fact",
+          source_turn_ids: ["turn-assistant"],
+        },
+      ],
+      last_operation: {
+        request_id: "11111111-1111-4111-8111-111111111111",
+        kind: "answer",
+        status: "running",
+      },
+    });
+    render(<InterviewPageContent interviewId="interview-1" />);
+    expect(await screen.findByRole("status")).toHaveTextContent("저장된 작업 상태를 확인");
+    expect(screen.getByLabelText("답변")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "설계 제안 생성" })).toBeDisabled();
+    const confirmation = screen.getByRole("button", { name: "사실 확인" });
+    expect(confirmation).toBeDisabled();
+    fireEvent.click(confirmation);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  test("unlocks an expired persisted operation and retries its immutable saved answer", async () => {
+    const envelope = {
+      request_id: "11111111-1111-4111-8111-111111111111",
+      expected_revision: 2,
+      answer: "임대 만료 전에 저장한 답변",
+    };
+    window.sessionStorage.setItem(
+      "hf-interview-answer:interview-1",
+      JSON.stringify(envelope),
+    );
+    const answerBodies: Array<Record<string, unknown>> = [];
+    installFetch((path, init) => {
+      if (path === "/api/control-plane/interviews/interview-1") {
+        return response({
+          ok: true,
+          session: {
+            ...session,
+            last_operation: {
+              request_id: envelope.request_id,
+              kind: "answer",
+              status: "running",
+              lease_expired: true,
+            },
+          },
+        });
+      }
+      if (path === "/api/control-plane/designs") {
+        return response({ ok: true, items: [] });
+      }
+      if (path.endsWith("/turns")) {
+        answerBodies.push(JSON.parse(String(init?.body)));
+        return response({ ok: true, session: { ...session, revision: 3 } });
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    render(<InterviewPageContent interviewId="interview-1" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "이전 작업의 실행 임대가 만료되어 중단되었습니다.",
+    );
+    expect(screen.getByLabelText("답변")).not.toBeDisabled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "저장된 요청 다시 시도" }),
+    );
+    await waitFor(() => expect(answerBodies).toHaveLength(1));
+    expect(answerBodies[0]).toEqual(envelope);
+  });
+
+  test("offers a fresh proposal action when an expired operation has no saved client envelope", async () => {
+    const proposalBodies: Array<Record<string, unknown>> = [];
+    installFetch((path, init) => {
+      if (path === "/api/control-plane/interviews/interview-1") {
+        return response({
+          ok: true,
+          session: {
+            ...session,
+            last_operation: {
+              request_id: "11111111-1111-4111-8111-111111111111",
+              kind: "proposal",
+              status: "running",
+              lease_expired: true,
+            },
+          },
+        });
+      }
+      if (path === "/api/control-plane/designs") {
+        return response({ ok: true, items: [] });
+      }
+      if (path.endsWith("/proposals")) {
+        proposalBodies.push(JSON.parse(String(init?.body)));
+        return response(
+          { ok: false, code: "llm_timeout", error: "timed out" },
+          503,
+        );
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    render(<InterviewPageContent interviewId="interview-1" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "이전 작업의 실행 임대가 만료되어 중단되었습니다.",
+    );
+    expect(
+      screen.queryByRole("button", { name: "저장된 요청 다시 시도" }),
+    ).not.toBeInTheDocument();
+    const generateButton = screen.getByRole("button", {
+      name: "설계 제안 생성",
+    });
+    expect(generateButton).toBeEnabled();
+    fireEvent.click(generateButton);
+    await waitFor(() => expect(proposalBodies).toHaveLength(1));
+    expect(proposalBodies[0]).toEqual({
+      expected_revision: session.revision,
+      request_id: expect.not.stringMatching(
+        "11111111-1111-4111-8111-111111111111",
+      ),
+    });
+  });
+
+  test("keeps a failed choice retry immutable while new input follows the latest question", async () => {
+    const answerBodies: Array<Record<string, unknown>> = [];
+    const oldQuestion = {
+      ...session.turns[0],
+      id: "old-question",
+      options: [{ id: "old-option", label: "이전 제안" }],
+    };
+    const newQuestion = {
+      ...session.turns[0],
+      id: "new-question",
+      options: [{ id: "new-option", label: "최신 제안" }],
+    };
+    let sessionLoads = 0;
+    installFetch((path, init) => {
+      if (path === "/api/control-plane/interviews/interview-1") {
+        sessionLoads += 1;
+        return response({
+          ok: true,
+          session: {
+            ...session,
+            turns: [sessionLoads === 1 ? oldQuestion : newQuestion],
+          },
+        });
+      }
+      if (path === "/api/control-plane/designs") return response({ ok: true, items: [] });
+      if (path.endsWith("/turns")) {
+        answerBodies.push(JSON.parse(String(init?.body)));
+        return response(
+          { ok: false, code: "choice_question_not_current", error: "stale choice" },
+          409,
+        );
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    render(<InterviewPageContent interviewId="interview-1" />);
+
+    fireEvent.click(await screen.findByRole("radio", { name: "이전 제안" }));
+    fireEvent.click(screen.getByRole("button", { name: "답변 보내기" }));
+    await screen.findByRole("alert");
+    const failedBody = answerBodies[0];
+
+    fireEvent.click(screen.getByRole("button", { name: "최신 상태 다시 불러오기" }));
+    expect(await screen.findByRole("radio", { name: "최신 제안" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "저장된 요청 다시 시도" }));
+    await waitFor(() => expect(answerBodies).toHaveLength(2));
+    expect(answerBodies[1]).toEqual(failedBody);
+
+    fireEvent.click(screen.getByRole("radio", { name: "최신 제안" }));
+    fireEvent.click(screen.getByRole("button", { name: "답변 보내기" }));
+    await waitFor(() => expect(answerBodies).toHaveLength(3));
+    expect(answerBodies[2]).toMatchObject({
+      choice_answer: { question_turn_id: "new-question", option_id: "new-option" },
+    });
+    expect(answerBodies[2]?.request_id).not.toBe(failedBody?.request_id);
+  });
+
+  test("stops polling only after the final running response and manual refresh unlocks a completed operation", async () => {
+    vi.useFakeTimers();
+    let completed = false;
+    const running = {
+      ...session,
+      last_operation: {
+        request_id: "11111111-1111-4111-8111-111111111111",
+        kind: "answer",
+        status: "running",
+      },
+    };
+    installFetch((path) => {
+      if (path === "/api/control-plane/interviews/interview-1") {
+        return response({ ok: true, session: completed ? { ...session, revision: 3 } : running });
+      }
+      if (path === "/api/control-plane/designs") return response({ ok: true, items: [] });
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    render(<InterviewPageContent interviewId="interview-1" />);
+    await act(async () => {});
+    for (const delay of [10_000, 20_000, 30_000]) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(delay);
+      });
+    }
+    expect(screen.getByRole("alert")).toHaveTextContent("저장된 작업이 아직 완료되지 않았습니다");
+    expect(screen.getByLabelText("답변")).toBeDisabled();
+
+    completed = true;
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "최신 상태 다시 불러오기" }));
+    });
+    expect(screen.getByLabelText("답변")).not.toBeDisabled();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    vi.useRealTimers();
   });
 
   test("reconciles a succeeded answer after reload without resending it", async () => {
@@ -315,6 +631,7 @@ describe("InterviewPageContent lifecycle", () => {
     fireEvent.click(screen.getByRole("button", { name: "답변 보내기" }));
     expect(composer).toBeDisabled();
     expect(composer).toHaveValue("전송 중 답변");
+    expect(screen.getByRole("status")).toHaveTextContent("답변을 처리하고 다음 질문을 준비");
 
     pending.resolve(
       response({ ok: true, session: { ...session, revision: 3 } }),

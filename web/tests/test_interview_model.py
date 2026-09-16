@@ -5,8 +5,11 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+import httpx
 from openai import APIStatusError
+from openai import AsyncOpenAI
 from openai.lib._pydantic import to_strict_json_schema
+from openai.lib._parsing._responses import type_to_text_format_param
 from pydantic import ValidationError
 
 from web.api.config import Settings
@@ -21,8 +24,9 @@ from web.api.interviews.schemas import (
     DraftCandidate,
     InterviewReply,
     WireDraftCandidate,
+    WireInterviewReply,
 )
-from web.api.interviews.prompts import DRAFT_INSTRUCTIONS
+from web.api.interviews.prompts import DRAFT_INSTRUCTIONS, INTERVIEW_INSTRUCTIONS
 
 
 def context(*, answer: str = "Review rework is the bottleneck.") -> InterviewContext:
@@ -56,7 +60,7 @@ def initial_context() -> InterviewContext:
     )
 
 
-def reply(**overrides) -> InterviewReply:
+def reply(**overrides) -> WireInterviewReply:
     value = {
         "question": "Which planning handoff causes the most delay?",
         "stage": "planning",
@@ -70,9 +74,10 @@ def reply(**overrides) -> InterviewReply:
         ],
         "proposed_scope": "issue-to-reviewed-change",
         "ready_for_review": False,
+        "allow_custom_answer": True,
     }
     value.update(overrides)
-    return InterviewReply.model_validate(value)
+    return WireInterviewReply.model_validate(value)
 
 
 def settings(**overrides) -> Settings:
@@ -100,6 +105,10 @@ def wire_candidate(
     profile: dict, workflow: dict, scenarios: dict
 ) -> WireDraftCandidate:
     profile = dict(profile)
+    workflow = dict(workflow)
+    workflow["steps"] = [
+        {"approval_timing": "before", **step} for step in workflow["steps"]
+    ]
     profile["glossary"] = [
         {"term": term, "definition": definition}
         for term, definition in profile["glossary"].items()
@@ -159,8 +168,10 @@ def test_adapter_uses_async_default_credential_provider_and_bounded_responses_ca
     assert captured["model"] == "gpt-5.6-sol"
     assert captured["store"] is False
     assert captured["max_output_tokens"] < 8192
-    assert captured["text_format"] is InterviewReply
+    assert captured["text_format"] is WireInterviewReply
     assert "tools" not in captured
+    assert "reasoning" not in captured
+    assert "verbosity" not in captured
 
 
 def test_initial_and_followup_questions_request_korean_without_translating_machine_values():
@@ -416,6 +427,61 @@ def test_extra_fields_and_multiple_questions_are_rejected_by_schema():
         )
 
 
+def test_options_are_strict_unique_bounded_and_custom_answer_is_required():
+    valid = reply(
+        options=[
+            {"id": "approval-wait", "label": "승인 대기"},
+            {"id": "review-rework", "label": "검토 재작업"},
+        ]
+    )
+    assert valid.allow_custom_answer is True
+    with pytest.raises(ValidationError):
+        reply(options=[{"id": "same", "label": "하나"}, {"id": "same", "label": "둘"}])
+    with pytest.raises(ValidationError):
+        reply(options=[{"id": "UPPER", "label": "잘못된 ID"}])
+    with pytest.raises(ValidationError):
+        reply(options=[{"id": f"choice-{index}", "label": "선택"} for index in range(7)])
+    with pytest.raises(ValidationError):
+        InterviewReply.model_validate(
+            {**valid.model_dump(), "allow_custom_answer": False}
+        )
+
+
+def test_actual_responses_formatter_emits_no_non_null_defaults_for_wire_reply():
+    formatted = type_to_text_format_param(WireInterviewReply)
+
+    def assert_no_non_null_defaults(value):
+        if isinstance(value, dict):
+            assert value.get("default") in (None,)
+            for nested in value.values():
+                assert_no_non_null_defaults(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                assert_no_non_null_defaults(nested)
+
+    assert_no_non_null_defaults(formatted)
+    allow_custom = formatted["schema"]["properties"]["allow_custom_answer"]
+    assert allow_custom["const"] is True
+    assert "default" not in allow_custom
+    assert "allow_custom_answer" in formatted["schema"]["required"]
+    assert InterviewReply.model_validate(
+        {
+            "question": "질문",
+            "stage": "review",
+            "evidence": [],
+            "ready_for_review": False,
+        }
+    ).allow_custom_answer is True
+
+
+def test_prompt_requires_korean_suggestions_and_selected_stage_scope():
+    assert "2-5 concrete Korean options" in INTERVIEW_INSTRUCTIONS
+    assert "context.selected_stages" in DRAFT_INSTRUCTIONS
+    assert "review-bottleneck, never review_bottleneck" in INTERVIEW_INSTRUCTIONS
+    assert "malformed legacy scope" in INTERVIEW_INSTRUCTIONS
+    assert "do not reinterpret, translate, or normalize it" in DRAFT_INSTRUCTIONS
+
+
 def test_invented_source_turn_id_is_rejected_after_parsing():
     model, *_ = build_model(
         reply(
@@ -514,6 +580,12 @@ def test_draft_prompt_binds_catalog_effects_tools_and_selected_scope():
     assert "issue_tracker.system_id must name one declared profile system" in (
         DRAFT_INSTRUCTIONS
     )
+    assert "Preserve a known provider project identifier exactly" in (
+        DRAFT_INSTRUCTIONS
+    )
+    assert "never translate or fabricate it" in DRAFT_INSTRUCTIONS
+    assert "unverified local Markdown tracker" in DRAFT_INSTRUCTIONS
+    assert "instead of inventing a live" in DRAFT_INSTRUCTIONS
     assert "only issue-read, issue-create" in DRAFT_INSTRUCTIONS
     assert "each needs entry and traceability step must name an actual" in (
         DRAFT_INSTRUCTIONS
@@ -524,6 +596,9 @@ def test_draft_prompt_binds_catalog_effects_tools_and_selected_scope():
 
 def test_wire_glossary_conversion_is_sorted_and_rejects_duplicates():
     profile, workflow, scenarios, _ = candidate_documents()
+    workflow["steps"] = [
+        {"approval_timing": "before", **step} for step in workflow["steps"]
+    ]
     entries = list(profile["glossary"].items())
     profile["glossary"] = [
         {"term": term, "definition": definition}
@@ -561,7 +636,58 @@ def test_propose_design_converts_wire_shape_to_exact_canonical_shape():
     assert "ID, enum, capability" in captured["instructions"]
     assert "selected_scope" in captured["instructions"]
     assert captured["max_output_tokens"] == 6144
+    assert captured["reasoning"] == {"effort": "low"}
+    assert captured["text"] == {"verbosity": "low"}
+    assert "verbosity" not in captured
     assert "tools" not in captured
+
+
+def test_actual_sdk_serializes_draft_verbosity_inside_text_config():
+    _, _, _, catalog = candidate_documents()
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(
+            400,
+            json={
+                "error": {
+                    "message": "stop after request capture",
+                    "type": "invalid_request_error",
+                    "code": "captured",
+                }
+            },
+            request=request,
+        )
+
+    http_client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    client = AsyncOpenAI(
+        api_key="test-token",
+        base_url="https://example.invalid/openai/v1/",
+        http_client=http_client,
+        max_retries=0,
+    )
+    model = AzureOpenAIInterviewModel(
+        settings(),
+        credential_factory=Mock(return_value=SimpleNamespace(close=AsyncMock())),
+        token_provider_factory=Mock(return_value=AsyncMock(return_value="token")),
+        client_factory=Mock(return_value=client),
+        retry_delay_seconds=0,
+    )
+
+    async def exercise():
+        with pytest.raises(InterviewModelError):
+            await model.propose_design(context(), catalog)
+        await model.close()
+
+    run(exercise())
+
+    assert "verbosity" not in captured
+    text = captured["text"]
+    assert text["verbosity"] == "low"
+    assert text["format"]["type"] == "json_schema"
+    assert text["format"]["strict"] is True
+    assert text["format"]["schema"]["title"] == "WireDraftCandidate"
 
 
 def test_propose_design_rejects_invented_catalog_skill():

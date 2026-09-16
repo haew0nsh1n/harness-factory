@@ -128,12 +128,83 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
+    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
     fireEvent.change(screen.getByLabelText("워크플로 JSON"), {
       target: { value: "{bad-workflow" },
     });
+    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
     fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
 
-    expect(await screen.findByText(/워크플로 JSON이 올바르지 않습니다:/i)).toBeInTheDocument();
+    expect(
+      (await screen.findAllByText(/워크플로 JSON이 올바르지 않습니다:/i)).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("button", { name: "디버그 JSON 열고 수정" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "디버그 JSON 열고 수정" }));
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "워크플로 JSON" })).toHaveFocus(),
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test("keeps debug JSON closed by default and preserves invalid text across keyboard toggles", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse({ ok: true, design: designFixture("draft") }),
+    );
+
+    render(<StudioDesignPageContent designId="design-1" />);
+
+    await screen.findByRole("heading", { name: "Design draft" });
+    expect(
+      screen.getByRole("textbox", { name: "워크플로 JSON" }),
+    ).not.toBeVisible();
+
+    const summary = screen.getByText("고급 / 디버그 JSON");
+    summary.focus();
+    fireEvent.keyDown(summary, { key: "Enter" });
+    fireEvent.click(summary);
+    const workflowJson = screen.getByRole("textbox", { name: "워크플로 JSON" });
+    fireEvent.change(workflowJson, { target: { value: "{still-invalid" } });
+    fireEvent.click(summary);
+    expect(
+      screen.getByRole("textbox", { name: "워크플로 JSON" }),
+    ).not.toBeVisible();
+
+    summary.focus();
+    fireEvent.keyDown(summary, { key: " " });
+    fireEvent.click(summary);
+    expect(screen.getByRole("textbox", { name: "워크플로 JSON" })).toHaveValue(
+      "{still-invalid",
+    );
+  });
+
+  test("keeps a new hidden syntax error actionable after a prior save error is cleared", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse({ ok: true, design: designFixture("draft") }));
+
+    render(<StudioDesignPageContent designId="design-1" />);
+
+    await screen.findByRole("heading", { name: "Design draft" });
+    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    const workflowJson = screen.getByRole("textbox", { name: "워크플로 JSON" });
+    fireEvent.change(workflowJson, { target: { value: "{first-invalid" } });
+    fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
+    expect(
+      (await screen.findAllByText(/워크플로 JSON이 올바르지 않습니다:/i)).length,
+    ).toBeGreaterThan(0);
+
+    fireEvent.change(workflowJson, { target: { value: "{second-invalid" } });
+    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+
+    expect(
+      screen.getByRole("button", { name: "디버그 JSON 열고 수정" }),
+    ).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "워크플로 JSON" })).not.toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "디버그 JSON 열고 수정" }));
+    await waitFor(() => expect(workflowJson).toHaveFocus());
+    expect(workflowJson).toHaveValue("{second-invalid");
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -155,6 +226,7 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
+    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
     fireEvent.change(screen.getByLabelText("프로필 JSON"), {
       target: {
         value: JSON.stringify(
@@ -202,6 +274,7 @@ describe("StudioDesignPageContent", () => {
     fireEvent.change(screen.getByLabelText("고객 이름"), {
       target: { value: "Form-edited team" },
     });
+    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
     const profileJson = screen.getByLabelText("프로필 JSON");
     const advanced = JSON.parse((profileJson as HTMLTextAreaElement).value);
     advanced.constraints = ["Updated in advanced JSON"];
@@ -215,6 +288,42 @@ describe("StudioDesignPageContent", () => {
     expect(body.profile.name).toBe("Form-edited team");
     expect(body.profile.constraints).toEqual(["Updated in advanced JSON"]);
     expect(body.profile.extension).toEqual({ preserve: "profile" });
+  });
+
+  test("keeps transient structured rows and dirty state while invalid raw JSON is repaired", async () => {
+    const loaded = {
+      ...designFixture("draft"),
+      profile: {
+        ...designFixture("draft").profile,
+        glossary: {
+          brief: "Original brief definition",
+          handoff: "Original handoff definition",
+        },
+      },
+    };
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse({ ok: true, design: loaded }),
+    );
+
+    render(<StudioDesignPageContent designId="design-1" />);
+
+    await screen.findByRole("heading", { name: "Design draft" });
+    const pendingTerm = screen.getByLabelText("용어 1 키");
+    fireEvent.change(pendingTerm, { target: { value: "handoff" } });
+    expect(screen.getByText(/이미 존재하는 용어입니다/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    const workflowJson = screen.getByLabelText("워크플로 JSON");
+    const originalWorkflow = (workflowJson as HTMLTextAreaElement).value;
+    fireEvent.change(workflowJson, { target: { value: "{invalid" } });
+    expect(screen.getByText(/구조화된 양식을 갱신할 수 없는 JSON 형식/)).toBeInTheDocument();
+    fireEvent.change(workflowJson, { target: { value: originalWorkflow } });
+
+    expect(screen.getByLabelText("용어 1 키")).toHaveValue("handoff");
+    expect(screen.getByText(/이미 존재하는 용어입니다/)).toBeInTheDocument();
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
   });
 
   test("blocks PUT for an invalid typed field and preserves it across a sibling edit", async () => {
@@ -263,6 +372,7 @@ describe("StudioDesignPageContent", () => {
       target: { value: "reviewer" },
     });
 
+    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
     const profile = JSON.parse(
       (screen.getByLabelText("프로필 JSON") as HTMLTextAreaElement).value,
     );
@@ -294,6 +404,7 @@ describe("StudioDesignPageContent", () => {
       target: { value: "Edited valid sibling" },
     });
 
+    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
     const profile = JSON.parse(
       (screen.getByLabelText("프로필 JSON") as HTMLTextAreaElement).value,
     );
@@ -340,6 +451,7 @@ describe("StudioDesignPageContent", () => {
     expect(await screen.findByText(/양식 오류를 수정한 뒤 저장하세요/)).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 
+    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
     const profile = JSON.parse(
       (screen.getByLabelText("프로필 JSON") as HTMLTextAreaElement).value,
     );
@@ -382,6 +494,7 @@ describe("StudioDesignPageContent", () => {
     expect(await screen.findByText(/양식 오류를 수정한 뒤 저장하세요/)).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 
+    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
     const profile = JSON.parse(
       (screen.getByLabelText("프로필 JSON") as HTMLTextAreaElement).value,
     );
@@ -433,6 +546,7 @@ describe("StudioDesignPageContent", () => {
     }
     fireEvent.blur(termInput);
 
+    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
     await waitFor(() => {
       const profile = JSON.parse(
         (screen.getByLabelText("프로필 JSON") as HTMLTextAreaElement).value,
@@ -793,5 +907,20 @@ describe("StudioDesignPageContent", () => {
     ).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "사실 확인" })).not.toBeInTheDocument();
     expect(screen.getByText("답변 입력 미제공")).toBeInTheDocument();
+  });
+
+  test("shows a catalog summary without exposing raw catalog JSON by default", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse({ ok: true, design: designFixture("draft") }),
+    );
+
+    render(<StudioDesignPageContent designId="design-1" />);
+
+    await screen.findByRole("heading", { name: "Design draft" });
+    expect(screen.getByRole("heading", { name: "승인 카탈로그" })).toBeInTheDocument();
+    expect(screen.getByText(/6개 스킬/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "카탈로그 JSON" }),
+    ).not.toBeVisible();
   });
 });

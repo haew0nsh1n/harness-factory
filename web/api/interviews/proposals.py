@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 from hmac import compare_digest
 from uuid import uuid4
@@ -37,6 +38,7 @@ from .schemas import (
     DraftCandidate,
     InterviewProposalDetailResponse,
     ProposalRequest,
+    WORKFLOW_ID_PATTERN,
 )
 from .service import (
     InterviewConflict,
@@ -44,6 +46,7 @@ from .service import (
     InterviewNotFound,
     InterviewTargetNotFound,
 )
+from .stages import stored_stages
 
 
 def _utcnow() -> datetime:
@@ -123,6 +126,12 @@ class ProposalService:
         try:
             raw_candidate = await self._model.propose_design(context, catalog)
             candidate = DraftCandidate.model_validate(raw_candidate)
+            candidate_stages = tuple(item.stage for item in candidate.profile.sdlc)
+            if candidate_stages != context.selected_stages:
+                raise InterviewModelError(
+                    "llm_invalid_result",
+                    "The model returned SDLC stages outside the selected scope.",
+                )
             validate_catalog_references(candidate, catalog)
         except (InterviewModelError, PydanticValidationError) as exc:
             code = (
@@ -356,6 +365,13 @@ class ProposalService:
             session = self._required_session(
                 db, actor.organization_id, session_id, now
             )
+            if session.selected_scope is not None and re.fullmatch(
+                WORKFLOW_ID_PATTERN, session.selected_scope
+            ) is None:
+                raise InterviewConflict(
+                    "scope_invalid",
+                    "selected scope is not a canonical workflow ID",
+                )
             operation = db.scalar(
                 select(InterviewOperation).where(
                     InterviewOperation.organization_id == actor.organization_id,
@@ -794,7 +810,19 @@ class ProposalService:
             session_id=session.id,
             revision=session.revision,
             turns=tuple(
-                InterviewTurn(id=turn.id, role=turn.role, text=turn.text)
+                InterviewTurn(
+                    id=turn.id,
+                    role=turn.role,
+                    text=turn.text,
+                    options=tuple(turn.options_json or []),
+                    allow_custom_answer=(
+                        True
+                        if turn.allow_custom_answer is None
+                        else turn.allow_custom_answer
+                    ),
+                    choice_question_turn_id=turn.choice_question_turn_id,
+                    choice_option_id=turn.choice_option_id,
+                )
                 for turn in turns
             ),
             confirmed_evidence=tuple(
@@ -810,6 +838,7 @@ class ProposalService:
             ),
             stage=session.stage,
             selected_scope=session.selected_scope,
+            selected_stages=stored_stages(session.selected_stages_json),
         )
 
     @staticmethod

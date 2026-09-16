@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from sqlalchemy import (
     JSON,
     DateTime,
+    Boolean,
     ForeignKeyConstraint,
     Index,
     Integer,
@@ -58,6 +59,9 @@ class InterviewSession(Base):
         String(32), nullable=False, default="discovery"
     )
     selected_scope: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    selected_stages_json: Mapped[list[str] | None] = mapped_column(
+        JSON, nullable=True
+    )
     proposed_evidence_json: Mapped[list[dict[str, object]]] = mapped_column(
         JSON, nullable=False, default=list
     )
@@ -182,6 +186,16 @@ class InterviewTurn(Base):
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    options_json: Mapped[list[dict[str, str]] | None] = mapped_column(
+        JSON, nullable=True
+    )
+    allow_custom_answer: Mapped[bool | None] = mapped_column(
+        Boolean, nullable=True
+    )
+    choice_question_turn_id: Mapped[str | None] = mapped_column(
+        String(36), nullable=True
+    )
+    choice_option_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
     )

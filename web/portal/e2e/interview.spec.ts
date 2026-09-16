@@ -20,7 +20,8 @@ function session(overrides: Record<string, unknown> = {}) {
     status: "active",
     consent_version: "2026-09-15",
     consented_at: now,
-    stage: "discovery",
+    stage: "planning",
+    selected_stages: ["planning", "implementation", "review"],
     scope: null,
     proposed_evidence: [],
     confirmed_evidence: [],
@@ -96,6 +97,9 @@ async function mockInterviewApi(page: Page): Promise<void> {
     const method = request.method();
 
     if (path === "/interviews" && method === "POST") {
+      expect(request.postDataJSON()).toMatchObject({
+        selected_stages: ["planning", "implementation", "review"],
+      });
       await route.fulfill({
         status: 201,
         contentType: "application/json",

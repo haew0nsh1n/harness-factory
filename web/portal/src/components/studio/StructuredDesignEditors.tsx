@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
+import { DebugJsonDisclosure } from "@/components/studio/DebugJsonDisclosure";
+import { DesignDocumentReview } from "@/components/studio/DesignDocumentReview";
 import { ProfileForm } from "@/components/studio/ProfileForm";
 import { ScenarioForm } from "@/components/studio/ScenarioForm";
 import { WorkflowForm } from "@/components/studio/WorkflowForm";
@@ -127,13 +129,16 @@ export function StructuredDesignEditors({
     return (
       <div className="structured-editors">
         <p className="readonly-notice">
-          이 제안은 다이제스트 검토용 읽기 전용입니다. 각 전체 JSON 문서는
-          키보드로 초점을 옮겨 스크롤하고 복사할 수 있습니다.
+          이 제안은 다이제스트 검토용 읽기 전용입니다. 먼저 사람이 읽을 수 있는
+          검토 내용을 확인하고, 원문이 필요할 때만 디버그 JSON을 여세요.
         </p>
-        <ReadOnlyDocument label="프로필" document={documents.profile} />
-        <ReadOnlyDocument label="워크플로" document={documents.workflow} />
-        <ReadOnlyDocument label="시나리오" document={documents.scenarios} />
-        <ReadOnlyDocument label="승인 카탈로그" document={documents.catalog} />
+        <DesignDocumentReview documents={documents} />
+        <DebugJsonDisclosure>
+          <ReadOnlyDocument label="프로필" document={documents.profile} />
+          <ReadOnlyDocument label="워크플로" document={documents.workflow} />
+          <ReadOnlyDocument label="시나리오" document={documents.scenarios} />
+          <ReadOnlyDocument label="승인 카탈로그" document={documents.catalog} />
+        </DebugJsonDisclosure>
         {findings.length > 0 ? (
           <section className="workspace-panel" aria-label="원문 검증 결과">
             <p className="eyebrow">원문 검증 결과</p>
@@ -183,13 +188,26 @@ export function StructuredDesignEditors({
         onChange={(scenarios) => onChange({ ...documents, scenarios })}
       />
       <FindingBlock findings={findings} prefix="catalog" />
-      <section className="workspace-panel structured-editor">
-        <p className="eyebrow">서버 소유</p>
-        <h2>승인 카탈로그</h2>
-        <pre className="readonly-json" tabIndex={0} aria-label="서버 승인 카탈로그">
-          {JSON.stringify(authoritativeCatalog ?? documents.catalog, null, 2)}
-        </pre>
-      </section>
+      <DesignDocumentReview
+        documents={{
+          ...documents,
+          catalog: authoritativeCatalog ?? documents.catalog,
+        }}
+        documentTypes={["catalog"]}
+      />
+      <DebugJsonDisclosure
+        label="카탈로그 원문 JSON"
+        hint="현재 서버 승인본과 이 설계에 저장된 스냅샷을 구분해 확인합니다."
+      >
+        <ReadOnlyDocument
+          label="현재 서버 승인 카탈로그"
+          document={authoritativeCatalog ?? documents.catalog}
+        />
+        <ReadOnlyDocument
+          label="설계에 저장된 카탈로그 스냅샷"
+          document={documents.catalog}
+        />
+      </DebugJsonDisclosure>
       {unplacedFindings.length > 0 ? (
         <section className="workspace-panel" aria-label="매핑되지 않은 검증 결과">
           <p className="eyebrow">원문 검증 결과</p>

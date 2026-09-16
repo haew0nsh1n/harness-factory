@@ -46,23 +46,53 @@ test("real portal proxy persists proposal into the selected SQLite target", asyn
   await page.goto("/studio/interviews/new");
   await page.getByLabel("인터뷰 이름").fill("Synthetic persisted interview");
   await page.getByLabel("고객 ID").fill("synthetic-team");
+  await page.getByRole("button", { name: "선택 해제" }).click();
+  await page.getByRole("checkbox", { name: "검토" }).check();
   await page.getByRole("checkbox", { name: /Azure OpenAI/ }).check();
   await page.getByRole("button", { name: "인터뷰 시작" }).click();
   await expect(page).toHaveURL(/\/studio\/interviews\/[0-9a-f-]+$/);
 
-  await page
-    .getByLabel("답변")
-    .fill(
-      "In this fictional team, unclear review criteria cause implementation rework.",
-    );
+  const interviewId = page.url().split("/").at(-1)!;
+  await page.getByRole("radio", { name: "불명확한 검토 기준" }).check();
   await page.getByRole("button", { name: "답변 보내기" }).click();
+  const resumed = await controlPlane<{
+    ok: true;
+    session: {
+      turns: Array<{
+        id: string;
+        role: string;
+        text: string;
+        choice_question_turn_id?: string | null;
+        choice_option_id?: string | null;
+      }>;
+      proposed_evidence: Array<{
+        statement: string;
+        source_turn_ids: string[];
+      }>;
+    };
+  }>(page, `/interviews/${interviewId}`);
+  const selectedTurn = resumed.body.session.turns.find(
+    (turn) => turn.role === "user" && turn.choice_option_id === "unclear-criteria",
+  );
+  expect(selectedTurn).toMatchObject({
+    text: "불명확한 검토 기준",
+    choice_question_turn_id: expect.any(String),
+    choice_option_id: "unclear-criteria",
+  });
+  expect(resumed.body.session.proposed_evidence).toContainEqual(
+    expect.objectContaining({
+      statement: expect.stringContaining("불명확한 검토 기준"),
+      source_turn_ids: [selectedTurn?.id],
+    }),
+  );
+  await expect(page.locator(".turn-user").last()).toContainText(
+    "불명확한 검토 기준",
+  );
   const evidenceReview = page
     .getByRole("heading", { name: "제안된 근거 결정" })
     .locator("..");
   await expect(
-    evidenceReview.getByText(
-      "Fictional review criteria are clarified before implementation.",
-    ),
+    evidenceReview.getByText(/불명확한 검토 기준/),
   ).toBeVisible();
   await evidenceReview.getByRole("button", { name: "사실 확인" }).click();
   await page.getByRole("button", { name: "설계 제안 생성" }).click();

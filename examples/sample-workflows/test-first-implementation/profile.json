@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "customer_id": "fictional-test-first-implementation",
+  "name": "가상 고객 - 테스트 우선 구현 샘플",
+  "sdlc": [
+    {"stage": "implementation", "current": "구현 후 테스트를 추가해 실패 원인을 구분하기 어렵다.", "desired": "승인된 계획을 작은 red-green-refactor 주기로 구현하고 관찰한 결과를 남긴다."}
+  ],
+  "glossary": {
+    "plan": "대상 변경과 검증 방법이 승인된 실행 계획",
+    "test-results": "실제로 실행한 명령, 실패와 성공 결과를 기록한 증거"
+  },
+  "systems": [
+    {"id": "issue-store", "kind": "git-markdown-issue-tracker", "tool": "git", "capabilities": ["issue-read"]}
+  ],
+  "issue_tracker": {
+    "system_id": "issue-store",
+    "provider": "markdown",
+    "connection": "local",
+    "project": "fictional-project",
+    "path": "issues",
+    "skill": null,
+    "mcp": null,
+    "capabilities": ["issue-read"]
+  },
+  "roles": ["consultant", "engineer", "test-owner"],
+  "pains": [
+    {"description": "테스트 증거 없이 구현 완료가 보고된다.", "impact": "회귀 위험과 재검증 시간이 늘어난다.", "frequency": "가상 예시이며 실제 빈도는 확인되지 않았다."}
+  ],
+  "success_criteria": [
+    "실패를 먼저 관찰하고 최소 변경 뒤 성공을 다시 관찰한다.",
+    "실행하지 못한 테스트를 통과로 기록하지 않는다."
+  ],
+  "constraints": [
+    "가상 고객 정보이며 실제 저장소와 테스트 명령은 확인되지 않았다.",
+    "승인된 plan 밖의 리팩터링이나 외부 게시를 수행하지 않는다."
+  ],
+  "facts": [
+    {"id": "fictional-source", "statement": "샘플 내용은 제품 동작 설명을 위한 가상 자료다.", "evidence": "저장소에 포함된 개발 fixture"}
+  ],
+  "assumptions": ["실행 시점에 승인된 plan과 로컬 테스트 도구가 제공된다."],
+  "unknowns": ["실제 테스트 프레임워크, 명령과 회귀 범위는 확인되지 않았다."]
+}

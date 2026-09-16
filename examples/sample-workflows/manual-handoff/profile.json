@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "customer_id": "fictional-manual-handoff",
+  "name": "가상 고객 - 수동 인계 샘플",
+  "sdlc": [
+    {"stage": "review", "current": "리뷰 뒤 게시 책임과 재개 증거가 불명확하다.", "desired": "명시적 human owner가 승인 후 기존 절차로 PR을 만들고 URL을 제공한다."}
+  ],
+  "glossary": {
+    "review-report": "중요 결함과 테스트 증거가 정리된 리뷰 산출물",
+    "resume evidence": "수동 절차 뒤 동일 변경의 PR임을 확인할 수 있는 URL과 담당자 확인"
+  },
+  "systems": [
+    {"id": "repository", "kind": "git-markdown-repository", "tool": "git", "capabilities": ["issue-read"]}
+  ],
+  "issue_tracker": {
+    "system_id": "repository",
+    "provider": "markdown",
+    "connection": "local",
+    "project": "fictional-project",
+    "path": "issues",
+    "skill": null,
+    "mcp": null,
+    "capabilities": ["issue-read"]
+  },
+  "roles": ["consultant", "reviewer", "maintainer"],
+  "pains": [
+    {"description": "수동 게시 뒤 어떤 증거로 자동 흐름을 재개할지 불명확하다.", "impact": "중복 PR이나 잘못된 완료 보고 위험이 생긴다.", "frequency": "가상 예시이며 실제 빈도는 확인되지 않았다."}
+  ],
+  "success_criteria": [
+    "maintainer의 사전 승인과 직접 행동 없이는 PR을 만들지 않는다.",
+    "PR URL과 reviewed change 확인이 있어야 수동 단계를 완료한다."
+  ],
+  "constraints": [
+    "가상 고객 정보이며 실제 원격 저장소와 권한은 확인되지 않았다.",
+    "이 워크플로는 자동 release, merge 또는 deploy를 수행하지 않는다."
+  ],
+  "facts": [
+    {"id": "fictional-source", "statement": "샘플 내용은 제품 동작 설명을 위한 가상 자료다.", "evidence": "저장소에 포함된 개발 fixture"}
+  ],
+  "assumptions": ["maintainer가 조직의 기존 승인된 PR 절차를 알고 있다."],
+  "unknowns": [  "실제 PR 도구, 원격 권한과 원격 읽기 연결은 확인되지 않았다."]
+}

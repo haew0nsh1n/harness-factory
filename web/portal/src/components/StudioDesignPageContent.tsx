@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { JsonEditor } from "@/components/JsonEditor";
 import { StatusBadge } from "@/components/StatusBadge";
+import { DebugJsonDisclosure } from "@/components/studio/DebugJsonDisclosure";
 import {
   InterviewWorkspace,
   type EvidenceItem,
@@ -251,6 +252,8 @@ export function StudioDesignPageContent({
     dirty: boolean;
     errors: DesignFormErrors;
   }>({ dirty: false, errors: {} });
+  const [lastValidStructuredDocuments, setLastValidStructuredDocuments] =
+    useState<DesignDocuments | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -363,16 +366,33 @@ export function StudioDesignPageContent({
         : {},
     [authoritativeCatalog, structuredDocuments],
   );
+  const liveDocumentErrors = useMemo(
+    () => documents ? validateDraftDocuments(documents).errors : {},
+    [documents],
+  );
+  const visibleDocumentErrors = {
+    ...documentErrors,
+    ...liveDocumentErrors,
+  };
+  useEffect(() => {
+    if (structuredDocuments) {
+      setLastValidStructuredDocuments(structuredDocuments);
+    }
+  }, [structuredDocuments]);
+  const displayedStructuredDocuments =
+    structuredDocuments ?? lastValidStructuredDocuments;
   const buildStatus = build?.status ?? (design ? buildStatusFromDesign(design.status) : null);
 
   function updateDocument(field: keyof DraftDocuments, value: string): void {
     setDocuments((current) => (current ? { ...current, [field]: value } : current));
     setStatusMessage("저장하지 않은 변경 사항이 있습니다.");
     setDocumentErrors((current) => {
-      if (!current[field]) {
+      if (!(field in current)) {
         return current;
       }
-      return { ...current, [field]: undefined };
+      const next = { ...current };
+      delete next[field];
+      return next;
     });
   }
 
@@ -653,31 +673,34 @@ export function StudioDesignPageContent({
         }
       />
 
-      {structuredDocuments ? (
-        <StructuredDesignEditors
-          documents={structuredDocuments}
-          authoritativeCatalog={authoritativeCatalog}
-          findings={mappedFindings}
-          errors={structuredErrors}
-          onTransientStateChange={setTransientFormState}
-          onChange={(next) => {
-            setDocuments({
-              profile: prettyJson(next.profile),
-              workflow: prettyJson(next.workflow),
-              scenarios: prettyJson(next.scenarios),
-              catalog: documents.catalog,
-            });
-            setStatusMessage("저장하지 않은 변경 사항이 있습니다.");
-          }}
-        />
-      ) : (
+      {!structuredDocuments ? (
         <section className="workspace-panel" role="alert">
           <p className="error-text">
-            구조화된 양식을 표시할 수 없는 JSON 형식입니다. 아래 고급 JSON의 명시적
-            오류를 수정하세요. 원본 값은 자동으로 비우거나 저장하지 않습니다.
+            구조화된 양식을 갱신할 수 없는 JSON 형식입니다. 디버그 JSON을 열어
+            오류를 수정하세요. 기존 양식 상태와 원본 값은 유지되며 저장되지 않습니다.
           </p>
         </section>
-      )}
+      ) : null}
+      {displayedStructuredDocuments ? (
+        <div hidden={!structuredDocuments}>
+          <StructuredDesignEditors
+            documents={displayedStructuredDocuments}
+            authoritativeCatalog={authoritativeCatalog}
+            findings={mappedFindings}
+            errors={structuredErrors}
+            onTransientStateChange={setTransientFormState}
+            onChange={(next) => {
+              setDocuments({
+                profile: prettyJson(next.profile),
+                workflow: prettyJson(next.workflow),
+                scenarios: prettyJson(next.scenarios),
+                catalog: documents.catalog,
+              });
+              setStatusMessage("저장하지 않은 변경 사항이 있습니다.");
+            }}
+          />
+        </div>
+      ) : null}
 
       <div className="detail-grid">
       <section className="workspace-panel">
@@ -712,34 +735,47 @@ export function StudioDesignPageContent({
       </section>
       </div>
 
-      <JsonEditor
-        label="Profile"
-        value={structuredDocuments?.profile ?? design.profile}
-        textValue={documents.profile}
-        onChange={(value) => updateDocument("profile", value)}
-        errorMessage={documentErrors.profile}
-      />
-      <JsonEditor
-        label="Workflow"
-        value={structuredDocuments?.workflow ?? design.workflow}
-        textValue={documents.workflow}
-        onChange={(value) => updateDocument("workflow", value)}
-        errorMessage={documentErrors.workflow}
-      />
-      <JsonEditor
-        label="Scenarios"
-        value={structuredDocuments?.scenarios ?? design.scenarios}
-        textValue={documents.scenarios}
-        onChange={(value) => updateDocument("scenarios", value)}
-        errorMessage={documentErrors.scenarios}
-      />
-      <JsonEditor
-        label="Catalog"
-        value={structuredDocuments?.catalog ?? design.catalog}
-        textValue={documents.catalog}
-        disabled
-        errorMessage={documentErrors.catalog}
-      />
+      <DebugJsonDisclosure
+        label="고급 / 디버그 JSON"
+        hint="원문을 직접 확인하거나 구조화된 양식으로 복구할 때 사용합니다."
+        errors={(Object.keys(visibleDocumentErrors) as DraftDocumentField[]).flatMap(
+          (field) => visibleDocumentErrors[field] ? [visibleDocumentErrors[field]] : [],
+        )}
+        focusTargetLabel={
+          (Object.keys(visibleDocumentErrors) as DraftDocumentField[])
+            .map((field) => visibleDocumentErrors[field] ? fieldLabel(field) : null)
+            .find((label): label is string => label !== null)
+        }
+      >
+        <JsonEditor
+          label="Profile"
+          value={structuredDocuments?.profile ?? design.profile}
+          textValue={documents.profile}
+          onChange={(value) => updateDocument("profile", value)}
+          errorMessage={visibleDocumentErrors.profile}
+        />
+        <JsonEditor
+          label="Workflow"
+          value={structuredDocuments?.workflow ?? design.workflow}
+          textValue={documents.workflow}
+          onChange={(value) => updateDocument("workflow", value)}
+          errorMessage={visibleDocumentErrors.workflow}
+        />
+        <JsonEditor
+          label="Scenarios"
+          value={structuredDocuments?.scenarios ?? design.scenarios}
+          textValue={documents.scenarios}
+          onChange={(value) => updateDocument("scenarios", value)}
+          errorMessage={visibleDocumentErrors.scenarios}
+        />
+        <JsonEditor
+          label="Catalog"
+          value={structuredDocuments?.catalog ?? design.catalog}
+          textValue={documents.catalog}
+          disabled
+          errorMessage={visibleDocumentErrors.catalog}
+        />
+      </DebugJsonDisclosure>
     </div>
   );
 }

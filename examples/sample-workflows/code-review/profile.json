@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "customer_id": "fictional-code-review",
+  "name": "가상 고객 - 코드 리뷰 샘플",
+  "sdlc": [
+    {"stage": "review", "current": "변경 의도와 테스트 증거가 분리되어 리뷰 누락이 생긴다.", "desired": "구현과 실제 테스트 결과를 함께 읽고 중요한 결함을 근거와 함께 보고한다."}
+  ],
+  "glossary": {
+    "implementation": "리뷰할 로컬 변경과 그 의도",
+    "review-report": "요구사항, 결함, 테스트 증거와 미확인 사항을 구분한 읽기 전용 보고서"
+  },
+  "systems": [
+    {"id": "issue-store", "kind": "git-markdown-issue-tracker", "tool": "git", "capabilities": ["issue-read"]}
+  ],
+  "issue_tracker": {
+    "system_id": "issue-store",
+    "provider": "markdown",
+    "connection": "local",
+    "project": "fictional-project",
+    "path": "issues",
+    "skill": null,
+    "mcp": null,
+    "capabilities": ["issue-read"]
+  },
+  "roles": ["consultant", "engineer", "reviewer"],
+  "pains": [
+    {"description": "리뷰가 형식 확인에 머물고 중요한 동작 오류를 놓친다.", "impact": "수정이 늦어지고 재리뷰가 필요하다.", "frequency": "가상 예시이며 실제 빈도는 확인되지 않았다."}
+  ],
+  "success_criteria": [
+    "중요한 발견은 파일 위치, 영향과 재현 근거를 포함한다.",
+    "제공되지 않은 테스트 결과를 발명하지 않는다."
+  ],
+  "constraints": [
+    "가상 고객 정보이며 실제 저장소 규칙과 브랜치는 확인되지 않았다.",
+    "리뷰는 읽기 전용이며 자동 수정, 게시, 승인 또는 병합을 하지 않는다."
+  ],
+  "facts": [
+    {"id": "fictional-source", "statement": "샘플 내용은 제품 동작 설명을 위한 가상 자료다.", "evidence": "저장소에 포함된 개발 fixture"}
+  ],
+  "assumptions": ["실행 시점에 implementation과 test-results가 함께 제공된다."],
+  "unknowns": ["실제 심각도 기준과 필수 회귀 테스트는 확인되지 않았다."]
+}

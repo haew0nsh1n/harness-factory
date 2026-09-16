@@ -6,6 +6,7 @@ from web.api.audit.models import AuditEvent
 from web.api.interviews.models import InterviewSession, InterviewTurn
 from web.api.interviews.service import delete_expired_interviews
 from web.tests.test_interview_api import (
+    ChoiceInterviewModel,
     FakeInterviewModel,
     headers,
     start_interview,
@@ -61,6 +62,82 @@ def test_secret_answer_is_not_stored_or_sent(interview_client_factory):
             )
         ).all()
         assert [turn.role for turn in turns] == ["assistant"]
+
+
+def test_resolved_choice_label_is_privacy_checked_before_storage_or_inference(
+    interview_client_factory,
+):
+    model = ChoiceInterviewModel()
+    client, app = interview_client_factory(model)
+    with client:
+        session = client.post(
+            "/api/interviews",
+            headers=headers(),
+            json={**start_payload(), "selected_stages": ["review"]},
+        ).json()["session"]
+        question = session["turns"][0]
+        with app.state.session_factory.begin() as db:
+            stored = db.get(InterviewTurn, question["id"])
+            assert stored is not None
+            stored.options_json = [
+                {
+                    "id": "slow-approval",
+                    "label": "Authorization: Bearer abcdefghijklmnopqrstuvwxyz",
+                }
+            ]
+        calls = len(model.calls)
+        response = client.post(
+            f"/api/interviews/{session['id']}/turns",
+            headers=headers(),
+            json={
+                "expected_revision": session["revision"],
+                "request_id": str(uuid4()),
+                "choice_answer": {
+                    "question_turn_id": question["id"],
+                    "option_id": "slow-approval",
+                },
+            },
+        )
+        assert response.status_code == 422
+        assert response.json()["code"] == "secret_detected"
+        assert len(model.calls) == calls
+    with app.state.session_factory() as db:
+        turns = db.scalars(
+            select(InterviewTurn).where(InterviewTurn.session_id == session["id"])
+        ).all()
+        assert [turn.role for turn in turns] == ["assistant"]
+
+
+def test_model_option_label_is_privacy_checked_before_persistence(
+    interview_client_factory,
+):
+    class SecretOptionModel(ChoiceInterviewModel):
+        async def next_question(self, context):
+            reply = await super().next_question(context)
+            return type(reply).model_validate(
+                {
+                    **reply.model_dump(),
+                    "options": [
+                        {
+                            "id": "secret",
+                            "label": "api_key=abcdefghijklmnopqrstuvwxyz",
+                        }
+                    ],
+                }
+            )
+
+    model = SecretOptionModel()
+    client, app = interview_client_factory(model)
+    with client:
+        response = client.post(
+            "/api/interviews",
+            headers=headers(),
+            json={**start_payload(), "selected_stages": ["review"]},
+        )
+        assert response.status_code == 422
+        assert response.json()["code"] == "secret_detected"
+    with app.state.session_factory() as db:
+        assert db.scalar(select(func.count()).select_from(InterviewTurn)) == 0
 
 
 def test_delete_audit_contains_identifiers_not_conversation_text(

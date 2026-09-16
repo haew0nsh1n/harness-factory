@@ -9,7 +9,9 @@ KOREAN_OUTPUT_POLICY = """모델이 생성하는 모든 자연어 콘텐츠는 �
 이 규칙을 일관되게 적용하세요. 필요한 경우 제품명과 사용자가 직접 말한 인용문은 원문을
 유지하세요. ID, enum, capability, 객체 key, 파일 경로, 명령, schema 값과 제공된 canonical
 authority 값은 기계 판독 값이므로 번역하거나 변경하지 마세요. 특히 proposed_scope와
-workflow.id는 selected_scope에 쓰이는 동일한 기계 식별자를 그대로 유지하고 번역하지 마세요.
+workflow.id는 유효한 selected_scope에 쓰이는 동일한 기계 식별자를 그대로 유지하고
+번역하지 마세요. 다만 이전 기록의 잘못된 scope 값은 그대로 반복하거나 조용히 정규화하지
+마세요.
 이전 대화 기록 자체를 다시 쓰거나 번역하지 말고, 이번 응답에서 새로 생성하는 자연어만
 한국어로 작성하세요.
 
@@ -18,6 +20,18 @@ workflow.id는 selected_scope에 쓰이는 동일한 기계 식별자를 그대�
 
 INTERVIEW_INSTRUCTIONS = KOREAN_OUTPUT_POLICY + """You conduct an adaptive SDLC interview.
 Ask exactly one concrete next question, beginning with the selected bottleneck.
+Ask questions only for context.selected_stages, in canonical order; summary is an
+implicit terminal stage and must not be interviewed as a selected lifecycle stage.
+Necessary prerequisites from unselected stages may be described only as workflow
+inputs or manual handoffs, not expanded into an unselected-stage interview.
+proposed_scope must be a canonical lowercase hyphen identifier matching
+^[a-z][a-z0-9-]*$ (for example review-bottleneck, never review_bottleneck).
+If a malformed legacy scope appears in context, propose a new valid identifier rather
+than echoing or silently normalizing that malformed value.
+For bounded categorical questions such as tools, bottlenecks, or review patterns,
+offer 2-5 concrete Korean options. Use no options for nuanced free-text questions.
+Options are suggestions, never established user facts, and custom text must always
+remain allowed. Never invent a choice or force the user to select an option.
 Cover only relevant lifecycle stages. Separate facts, assumptions, and unknowns.
 Use only supplied turn IDs for evidence; your evidence IDs are temporary proposal
 references that the server will replace. Propose one workflow scope.
@@ -28,16 +42,28 @@ DRAFT_INSTRUCTIONS = KOREAN_OUTPUT_POLICY + """Create strict candidate profile, 
 Use only the supplied authoritative catalog IDs and capabilities. Do not copy or mutate
 catalog bodies. Do not include workflow approval: a human and server supply it later.
 Do not invent connector verification, evaluation receipts, identities, or timestamps.
-The workflow id must equal the selected scope and scenarios.workflow. Every workflow
-step skill must exactly match a supplied catalog skill id. Its effect must be one of
+The workflow id must equal the selected scope and scenarios.workflow. The selected scope
+must already be a valid canonical lowercase hyphen identifier matching
+^[a-z][a-z0-9-]*$; do not reinterpret, translate, or normalize it. Every workflow step
+skill must exactly match a supplied catalog skill id. Its effect must be one of
 that catalog skill's effects. Its tools must include every capability in that skill's
 requires list, expressed only as <declared-system-id>.<capability>; every such capability
 must also appear on that declared profile system. Do not add any other tool binding.
 Use a manual step when the interview does not establish a compatible connector.
 The issue_tracker.system_id must name one declared profile system, and its capabilities
 must be a subset of that system's capabilities and only issue-read, issue-create,
-issue-update, issue-transition, or issue-comment. Markdown uses local+git+safe relative
-path; GitHub/Jira use skill or mcp, no path, and matching system tool and connection.
+issue-update, issue-transition, or issue-comment. For Markdown, set
+issue_tracker.connection to local, the matching declared system.tool to the exact token
+git, issue_tracker.path to a safe relative path, and both issue_tracker.skill and
+issue_tracker.mcp to null. The catalog workflow skill hf-issues-markdown is not an
+issue_tracker.skill connector. GitHub/Jira use skill or mcp, no path, and matching
+system tool and connection.
+Preserve a known provider project identifier exactly; never translate or fabricate it.
+GitHub project identifiers must use owner/repository, Jira project identifiers must use
+an uppercase project key, and Markdown project identifiers must be one safe token. When
+the connector or project is not established by confirmed evidence, prefer an explicitly
+unverified local Markdown tracker and manual workflow step instead of inventing a live
+GitHub or Jira project.
 Give every workflow step a unique id;
 each needs entry and traceability step must name an actual workflow step, without cycles.
 Each step input must come from workflow inputs or an ancestor step output, and every
@@ -45,8 +71,11 @@ workflow output must be produced. The scenarios workflow id must match the workf
 Before returning, check the full candidate against these referential-integrity rules and
 the catalog, system, effect, approval, artifact, tool, and scenario contracts.
 Prefer the smallest complete candidate justified by the confirmed evidence: include only
-relevant lifecycle entries, workflow steps, traceability, and one minimal scenario for
+context.selected_stages lifecycle entries (and no other SDLC entries), workflow steps,
+traceability, and one minimal scenario for
 each behavior needed to express the selected scope. Do not elaborate unsupported process.
+Represent prerequisites from unselected stages as described workflow inputs or manual
+handoffs rather than full unselected lifecycle entries.
 Return only the requested structured response."""
 
 

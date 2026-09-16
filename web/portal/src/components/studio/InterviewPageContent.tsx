@@ -6,6 +6,13 @@ import {
   InterviewWorkspace,
   type EvidenceItem,
 } from "@/components/studio/InterviewWorkspace";
+import { AnswerComposer } from "@/components/studio/AnswerComposer";
+import {
+  DEFAULT_SELECTED_STAGES,
+  InterviewStartForm,
+} from "@/components/studio/InterviewStartForm";
+import { OperationStatus } from "@/components/studio/OperationStatus";
+import { SelectedStagesProvider } from "@/components/studio/StageProgress";
 import {
   StructuredDesignEditors,
   type DesignDocuments,
@@ -42,6 +49,7 @@ interface InterviewPageContentProps {
 
 const CONSENT_VERSION = "2026-09-15" as const;
 const NEW_DESIGN = "new";
+const RESUME_POLL_DELAYS = [10_000, 20_000, 30_000] as const;
 
 function requestId(): string {
   if (typeof crypto.randomUUID === "function") {
@@ -52,6 +60,37 @@ function requestId(): string {
 
 function composerKey(interviewId: string): string {
   return `hf-interview-composer:${interviewId}`;
+}
+
+function selectedStagesFor(session: InterviewSession): string[] {
+  return session.selected_stages?.length
+    ? session.selected_stages
+    : ["discovery", "planning", "implementation", "testing", "review", "release", "operations"];
+}
+
+function isTextAnswer(
+  operation: AnswerOperationEnvelope,
+): operation is Extract<AnswerOperationEnvelope, { answer: string }> {
+  return "answer" in operation;
+}
+
+function currentQuestion(session: InterviewSession) {
+  const latest = session.turns.at(-1);
+  return latest?.role === "assistant" ? latest : null;
+}
+
+function hasActiveRunningOperation(session: InterviewSession | null): boolean {
+  return (
+    session?.last_operation?.status === "running" &&
+    session.last_operation.lease_expired !== true
+  );
+}
+
+function hasExpiredRunningOperation(session: InterviewSession | null): boolean {
+  return (
+    session?.last_operation?.status === "running" &&
+    session.last_operation.lease_expired === true
+  );
 }
 
 function safeError(cause: unknown): string {
@@ -81,6 +120,10 @@ function safeError(cause: unknown): string {
       "이 요청보다 최신 작업이 저장되었습니다. 현재 인터뷰를 다시 불러오세요.",
     request_id_reused:
       "이 요청 ID가 다른 내용에 사용되었습니다. 입력을 확인하고 새 요청으로 보내세요.",
+    choice_question_not_current:
+      "선택한 제안은 현재 질문에 대한 것이 아닙니다. 최신 질문을 다시 확인하세요.",
+    choice_option_not_found:
+      "선택한 AI 제안을 찾을 수 없습니다. 최신 질문을 다시 불러온 뒤 선택하세요.",
     stale_revision:
       "다른 변경이 먼저 저장되었습니다. 작성 중인 답변은 유지했습니다. 최신 상태를 다시 불러오세요.",
     stale_proposal:
@@ -89,6 +132,8 @@ function safeError(cause: unknown): string {
       "대상 설계가 검토 후 변경되었습니다. 제안은 유지되며 대상 설계를 다시 불러와 재검토해야 합니다.",
     scope_not_selected:
       "워크플로 범위가 아직 선택되지 않았습니다. 인터뷰를 계속해 범위를 확정하세요.",
+    scope_invalid:
+      "저장된 워크플로 범위 형식이 올바르지 않습니다. 인터뷰를 계속해 새 워크플로 범위를 확정하세요.",
     scope_mismatch:
       "제안된 워크플로 ID가 선택한 범위와 일치하지 않습니다. 제안을 다시 생성하세요.",
     proposal_already_applied:
@@ -169,6 +214,9 @@ export function InterviewPageContent({
   const [name, setName] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [consented, setConsented] = useState(false);
+  const [selectedStages, setSelectedStages] = useState<string[]>([
+    ...DEFAULT_SELECTED_STAGES,
+  ]);
   const [answer, setAnswer] = useState("");
   const [startOperation, setStartOperation] =
     useState<StartOperationEnvelope | null>(null);
@@ -186,6 +234,11 @@ export function InterviewPageContent({
     string | null
   >(null);
   const [busy, setBusy] = useState(false);
+  const [activeOperationKind, setActiveOperationKind] = useState<string | null>(
+    null,
+  );
+  const [resumePollAttempt, setResumePollAttempt] = useState(0);
+  const [resumePollingExhausted, setResumePollingExhausted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const alive = useRef(true);
@@ -223,6 +276,7 @@ export function InterviewPageContent({
         setName(stored.name);
         setCustomerId(stored.customer_id);
         setConsented(true);
+        setSelectedStages(stored.selected_stages ?? [...DEFAULT_SELECTED_STAGES]);
       }
       return;
     }
@@ -230,9 +284,50 @@ export function InterviewPageContent({
     setAnswer(window.sessionStorage.getItem(composerKey(interviewId)) ?? "");
     setAnswerOperation(readAnswerOperation(interviewId));
     setProposalOperation(readProposalOperation(interviewId));
+    setResumePollAttempt(0);
+    setResumePollingExhausted(false);
+    setError(null);
     void loadSession();
     void loadDesigns();
   }, [interviewId]);
+
+  useEffect(() => {
+    if (
+      !interviewId ||
+      !hasActiveRunningOperation(session) ||
+      resumePollingExhausted
+    ) {
+      return;
+    }
+    const delay = RESUME_POLL_DELAYS[resumePollAttempt];
+    if (delay === undefined) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const loaded = await loadSession();
+        if (!alive.current || !hasActiveRunningOperation(loaded)) {
+          return;
+        }
+        if (resumePollAttempt + 1 === RESUME_POLL_DELAYS.length) {
+          setResumePollingExhausted(true);
+          setError(
+            "저장된 작업이 아직 완료되지 않았습니다. 잠시 후 최신 상태를 다시 불러오세요.",
+          );
+          return;
+        }
+        setResumePollAttempt((attempt) => attempt + 1);
+      })();
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [
+    interviewId,
+    resumePollAttempt,
+    resumePollingExhausted,
+    session?.last_operation?.request_id,
+    session?.last_operation?.status,
+    session?.last_operation?.lease_expired,
+  ]);
 
   useEffect(() => {
     if (!interviewId || terminal.current) {
@@ -304,6 +399,9 @@ export function InterviewPageContent({
     }
     clearAnswerOperation(loaded.id);
     setAnswerOperation(null);
+    if (!isTextAnswer(stored)) {
+      return;
+    }
     setAnswer((current) => {
       if (current.trim() === stored.answer) {
         window.sessionStorage.removeItem(composerKey(loaded.id));
@@ -346,17 +444,27 @@ export function InterviewPageContent({
     }
   }
 
-  async function loadSession(): Promise<void> {
+  async function loadSession(): Promise<InterviewSession | null> {
     if (!interviewId) {
-      return;
+      return null;
     }
     try {
       const loaded = await api<InterviewSession>(`/interviews/${interviewId}`);
       if (!alive.current) {
-        return;
+        return null;
       }
       setSession(loaded);
-      setError(null);
+      if (!hasActiveRunningOperation(loaded)) {
+        setResumePollAttempt(0);
+        setResumePollingExhausted(false);
+        setError(
+          hasExpiredRunningOperation(loaded)
+            ? "이전 작업의 실행 임대가 만료되어 중단되었습니다. 저장된 요청을 다시 시도하거나 새 작업을 시작하세요."
+            : loaded.last_operation?.status === "failed"
+            ? "저장된 작업을 완료하지 못했습니다. 최신 상태를 다시 불러온 뒤 요청을 다시 시도하세요."
+            : null,
+        );
+      }
       const storedAnswer = readAnswerOperation(interviewId);
       setAnswerOperation(storedAnswer);
       reconcileAnswerOperation(loaded, storedAnswer);
@@ -384,15 +492,17 @@ export function InterviewPageContent({
         setProposal(null);
         setProposalDraft(null);
       }
+      return loaded;
     } catch (cause) {
       if (!alive.current) {
-        return;
+        return null;
       }
       if (cause instanceof ApiError && cause.status === 404) {
         handleTerminalNotFound(interviewId);
       } else {
         setError(safeError(cause));
       }
+      return null;
     }
   }
 
@@ -419,22 +529,29 @@ export function InterviewPageContent({
       setError("인터뷰 이름과 고객 ID를 입력하세요.");
       return;
     }
+    if (selectedStages.length === 0) {
+      setError("최소 한 개의 SDLC 단계를 선택하세요.");
+      return;
+    }
     const existing = startOperation ?? readStartOperation();
     const operation =
       existing &&
       existing.name === normalizedName &&
-      existing.customer_id === normalizedCustomerId
+      existing.customer_id === normalizedCustomerId &&
+      JSON.stringify(existing.selected_stages) === JSON.stringify(selectedStages)
         ? existing
         : {
             name: normalizedName,
             customer_id: normalizedCustomerId,
             consent_version: CONSENT_VERSION,
             consent_accepted: true as const,
+            selected_stages: selectedStages,
             request_id: requestId(),
           };
     setStartOperation(operation);
     writeStartOperation(operation);
     setBusy(true);
+    setActiveOperationKind("start");
     setError(null);
     try {
       const created = await api<InterviewSession>("/interviews", {
@@ -448,11 +565,12 @@ export function InterviewPageContent({
       setError(safeError(cause));
     } finally {
       setBusy(false);
+      setActiveOperationKind(null);
     }
   }
 
   async function sendAnswer(retry = false): Promise<void> {
-    if (!session || busy) {
+    if (!session || mutationBusy) {
       return;
     }
     const operation = retry
@@ -462,12 +580,14 @@ export function InterviewPageContent({
           request_id: requestId(),
           answer: answer.trim(),
         };
-    if (!operation?.answer) {
+    if (!operation || !isTextAnswer(operation) || !operation.answer) {
       return;
     }
+
     setAnswerOperation(operation);
     writeAnswerOperation(session.id, operation);
     setBusy(true);
+    setActiveOperationKind("answer");
     setError(null);
     try {
       const updated = await api<InterviewSession>(
@@ -493,6 +613,55 @@ export function InterviewPageContent({
       }
     } finally {
       setBusy(false);
+      setActiveOperationKind(null);
+    }
+  }
+
+  async function sendChoice(
+    questionTurnId: string,
+    optionId: string,
+    retry = false,
+  ): Promise<void> {
+    if (!session || mutationBusy) {
+      return;
+    }
+    const operation = retry
+      ? answerOperation
+      : {
+          expected_revision: session.revision,
+          request_id: requestId(),
+          choice_answer: {
+            question_turn_id: questionTurnId,
+            option_id: optionId,
+          },
+        };
+    if (
+      !operation ||
+      isTextAnswer(operation) ||
+      operation.choice_answer.question_turn_id !== questionTurnId
+    ) {
+      return;
+    }
+    setAnswerOperation(operation);
+    writeAnswerOperation(session.id, operation);
+    setBusy(true);
+    setActiveOperationKind("answer");
+    setError(null);
+    try {
+      const updated = await api<InterviewSession>(
+        `/interviews/${session.id}/turns`,
+        { method: "POST", body: operation },
+      );
+      setSession(updated);
+      clearAnswerOperation(session.id);
+      setAnswerOperation(null);
+    } catch (cause) {
+      if (!handleSessionFailure(cause, session.id)) {
+        setError(safeError(cause));
+      }
+    } finally {
+      setBusy(false);
+      setActiveOperationKind(null);
     }
   }
 
@@ -500,10 +669,11 @@ export function InterviewPageContent({
     evidenceId: string,
     decision: "confirm" | "reject",
   ): Promise<void> {
-    if (!session || busy) {
+    if (!session || mutationBusy) {
       return;
     }
     setBusy(true);
+    setActiveOperationKind("confirmation");
     setError(null);
     try {
       const updated = await api<InterviewSession>(
@@ -524,11 +694,12 @@ export function InterviewPageContent({
       }
     } finally {
       setBusy(false);
+      setActiveOperationKind(null);
     }
   }
 
   async function generateProposal(): Promise<void> {
-    if (!session || busy) {
+    if (!session || mutationBusy) {
       return;
     }
     const existing = proposalOperation ?? readProposalOperation(session.id);
@@ -542,6 +713,7 @@ export function InterviewPageContent({
     setProposalOperation(operation);
     writeProposalOperation(session.id, operation);
     setBusy(true);
+    setActiveOperationKind("proposal");
     setError(null);
     try {
       const generated = await api<InterviewProposal>(
@@ -563,6 +735,7 @@ export function InterviewPageContent({
       }
     } finally {
       setBusy(false);
+      setActiveOperationKind(null);
     }
   }
 
@@ -575,6 +748,7 @@ export function InterviewPageContent({
       return;
     }
     setBusy(true);
+    setActiveOperationKind("apply");
     setError(null);
     writeSelectedProposal(session.id, proposalId);
     await loadProposal(session, summary);
@@ -587,7 +761,7 @@ export function InterviewPageContent({
       !proposal ||
       !proposalDraft ||
       !scopeConfirmed ||
-      busy
+      mutationBusy
     ) {
       return;
     }
@@ -633,6 +807,7 @@ export function InterviewPageContent({
       setError(safeError(cause));
     } finally {
       setBusy(false);
+      setActiveOperationKind(null);
     }
   }
 
@@ -641,6 +816,7 @@ export function InterviewPageContent({
       return;
     }
     setBusy(true);
+    setActiveOperationKind("delete");
     setError(null);
     try {
       const loaded = await api<HarnessDesign>(`/designs/${targetDesign.id}`);
@@ -653,11 +829,12 @@ export function InterviewPageContent({
       setError(safeError(cause));
     } finally {
       setBusy(false);
+      setActiveOperationKind(null);
     }
   }
 
   async function deleteInterview(): Promise<void> {
-    if (!session || busy) {
+    if (!session || mutationBusy) {
       return;
     }
     setBusy(true);
@@ -678,6 +855,14 @@ export function InterviewPageContent({
     () => (session ? evidenceItems(session) : []),
     [session],
   );
+  const activeRunning = hasActiveRunningOperation(session);
+  const mutationBusy = busy || activeRunning;
+  const pendingOperationKind =
+    busy
+      ? activeOperationKind
+      : activeRunning
+        ? (session?.last_operation?.kind ?? null)
+        : null;
 
   if (!interviewId) {
     return (
@@ -689,66 +874,20 @@ export function InterviewPageContent({
             첫 질문을 요청하기 전에 전송 대상과 보존 경계를 확인합니다.
           </p>
         </header>
-        <section className="workspace-panel consent-panel" aria-busy={busy}>
-          <div className="form-grid">
-            <label className="field">
-              <span>인터뷰 이름</span>
-              <input
-                value={name}
-                disabled={busy}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span>고객 ID</span>
-              <input
-                value={customerId}
-                disabled={busy}
-                onChange={(event) => setCustomerId(event.target.value)}
-                pattern="[a-z0-9][a-z0-9-]*"
-              />
-            </label>
-          </div>
-          <div className="privacy-notice">
-            <h2>전송 및 보존 확인</h2>
-            <p>
-              작성한 인터뷰 텍스트는 구성된 Azure OpenAI 배포로 전송되며
-              Responses 요청은 store: false로 처리됩니다. 인터뷰와 확인한 근거는
-              조직 범위 데이터베이스에 마지막 활동부터 30일간 보존됩니다.
-            </p>
-            <p>
-              인터뷰 삭제는 대화와 미적용 제안을 제거하지만 이미 만든 설계는
-              삭제하지 않습니다. 비밀, 자격 증명, 소스 코드, 저장소 파일 또는
-              이슈 본문을 입력하지 마세요. 패턴 검사는 모든 민감 정보를 보장해
-              찾을 수 없습니다.
-            </p>
-            <label className="consent-check">
-              <input
-                type="checkbox"
-                checked={consented}
-                disabled={busy}
-                onChange={(event) => setConsented(event.target.checked)}
-              />
-              <span>
-                Azure OpenAI 전송과 30일 보존·삭제 동작을 이해하고 인터뷰 시작에
-                동의합니다.
-              </span>
-            </label>
-          </div>
-          <button
-            className="button-primary"
-            type="button"
-            disabled={!consented || busy}
-            onClick={() => void startInterview()}
-          >
-            인터뷰 시작
-          </button>
-          {error ? (
-            <p className="error-text" role="alert">
-              {error}
-            </p>
-          ) : null}
-        </section>
+        <OperationStatus kind={busy ? "start" : null} />
+        <InterviewStartForm
+          name={name}
+          customerId={customerId}
+          consented={consented}
+          selectedStages={selectedStages}
+          busy={busy}
+          error={error}
+          onNameChange={setName}
+          onCustomerIdChange={setCustomerId}
+          onConsentChange={setConsented}
+          onSelectedStagesChange={setSelectedStages}
+          onStart={() => void startInterview()}
+        />
       </div>
     );
   }
@@ -769,7 +908,7 @@ export function InterviewPageContent({
   }
 
   return (
-    <div className="page-stack" aria-busy={busy}>
+    <div className="page-stack" aria-busy={mutationBusy}>
       <section className="workspace-panel interview-session-header">
         <div className="page-header">
           <div>
@@ -799,11 +938,18 @@ export function InterviewPageContent({
         ) : null}
       </section>
 
-      <InterviewWorkspace
+      <OperationStatus
+        kind={pendingOperationKind}
+        recovering={!busy && activeRunning}
+      />
+      <SelectedStagesProvider stages={selectedStagesFor(session)}>
+        <InterviewWorkspace
         title={session.name}
         stage={session.stage}
         evidence={evidence}
-        onConfirm={(id) => void decideEvidence(id, "confirm")}
+        onConfirm={
+          mutationBusy ? undefined : (id) => void decideEvidence(id, "confirm")
+        }
         boundary="질문, 답변, 근거 출처는 서버에 저장된 실제 인터뷰 기록입니다."
         conversation={
           <div className="turn-list" aria-live="polite">
@@ -822,45 +968,34 @@ export function InterviewPageContent({
           </div>
         }
         composer={
-          <div className="answer-composer">
-            <label className="field">
-              <span>답변</span>
-              <textarea
-                aria-label="답변"
-                rows={5}
-                maxLength={8000}
-                value={answer}
-                disabled={busy}
-                onChange={(event) => setAnswer(event.target.value)}
-                placeholder="확인 가능한 사실과 아직 모르는 내용을 구분해 입력하세요."
-              />
-            </label>
-            <div className="composer-actions">
-              <span>
-                {answer.length}/8000 · 입력 중에는 모델을 호출하지 않습니다.
-              </span>
-              <button
-                className="button-primary"
-                type="button"
-                disabled={!answer.trim() || busy}
-                onClick={() => void sendAnswer(false)}
-              >
-                답변 보내기
-              </button>
-              {answerOperation ? (
-                <button
-                  className="button-secondary"
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void sendAnswer(true)}
-                >
-                  저장된 요청 다시 시도
-                </button>
-              ) : null}
-            </div>
-          </div>
+          <AnswerComposer
+            question={currentQuestion(session)}
+            answer={answer}
+            busy={mutationBusy}
+            retryAvailable={Boolean(answerOperation)}
+            onAnswerChange={setAnswer}
+            onSendAnswer={() => void sendAnswer(false)}
+            onSendChoice={(questionTurnId, optionId) =>
+              void sendChoice(questionTurnId, optionId)
+            }
+            onRetry={() => {
+              if (!answerOperation) {
+                return;
+              }
+              if (isTextAnswer(answerOperation)) {
+                void sendAnswer(true);
+              } else {
+                void sendChoice(
+                  answerOperation.choice_answer.question_turn_id,
+                  answerOperation.choice_answer.option_id,
+                  true,
+                );
+              }
+            }}
+            />
         }
       />
+      </SelectedStagesProvider>
 
       {session.proposed_evidence.length > 0 ? (
         <section className="workspace-panel">
@@ -873,7 +1008,7 @@ export function InterviewPageContent({
                 <button
                   className="button-secondary"
                   type="button"
-                  disabled={busy}
+                  disabled={mutationBusy}
                   onClick={() => void decideEvidence(item.id, "confirm")}
                 >
                   사실 확인
@@ -881,7 +1016,7 @@ export function InterviewPageContent({
                 <button
                   className="button-secondary"
                   type="button"
-                  disabled={busy}
+                  disabled={mutationBusy}
                   onClick={() => void decideEvidence(item.id, "reject")}
                 >
                   근거 거절
@@ -903,7 +1038,7 @@ export function InterviewPageContent({
         <button
           className="button-primary"
           type="button"
-          disabled={busy}
+          disabled={mutationBusy}
           onClick={() => void generateProposal()}
         >
           {proposalOperation ? "저장된 제안 요청 다시 시도" : "설계 제안 생성"}
@@ -917,7 +1052,7 @@ export function InterviewPageContent({
             <select
               aria-label="검토할 저장된 제안"
               value={proposal?.id ?? ""}
-              disabled={busy}
+              disabled={mutationBusy}
               onChange={(event) => void selectProposal(event.target.value)}
             >
               {session.proposals.map((item) => (
@@ -958,7 +1093,7 @@ export function InterviewPageContent({
               <select
                 aria-label="적용 대상"
                 value={targetDesignId}
-                disabled={busy}
+                disabled={mutationBusy}
                 onChange={(event) => {
                   setTargetDesignId(event.target.value);
                   setTargetStale(false);
@@ -990,7 +1125,7 @@ export function InterviewPageContent({
               <input
                 type="checkbox"
                 checked={scopeConfirmed}
-                disabled={busy || targetStale}
+                disabled={mutationBusy || targetStale}
                 onChange={(event) =>
                   setConfirmedReviewIdentity(
                     event.target.checked ? reviewIdentity : null,
@@ -1006,7 +1141,7 @@ export function InterviewPageContent({
             <button
               className="button-primary"
               type="button"
-              disabled={!scopeConfirmed || busy || targetStale}
+              disabled={!scopeConfirmed || mutationBusy || targetStale}
               onClick={() => void applyProposal()}
             >
               정확한 제안 적용
@@ -1028,7 +1163,7 @@ export function InterviewPageContent({
             <button
               className="button-danger"
               type="button"
-              disabled={busy}
+              disabled={mutationBusy}
               onClick={() => void deleteInterview()}
             >
               인터뷰 영구 삭제
@@ -1036,7 +1171,7 @@ export function InterviewPageContent({
             <button
               className="button-secondary"
               type="button"
-              disabled={busy}
+              disabled={mutationBusy}
               onClick={() => setDeleteArmed(false)}
             >
               취소
@@ -1046,7 +1181,7 @@ export function InterviewPageContent({
           <button
             className="button-secondary"
             type="button"
-            disabled={busy}
+            disabled={mutationBusy}
             onClick={() => setDeleteArmed(true)}
           >
             삭제 확인

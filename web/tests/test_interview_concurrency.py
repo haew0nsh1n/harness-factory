@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 
 from web.api.config import Settings
 from web.api.db import Base
@@ -114,6 +115,39 @@ class CasRaceModel:
             ],
             proposed_scope=None,
             ready_for_review=False,
+        )
+
+    async def propose_design(self, context, catalog):
+        raise AssertionError
+
+    async def close(self):
+        return None
+
+
+class ChoiceRetryModel:
+    def __init__(self) -> None:
+        self.calls: list[InterviewContext] = []
+        self.fail = True
+
+    async def next_question(self, context: InterviewContext) -> InterviewReply:
+        self.calls.append(context)
+        if not context.turns:
+            return InterviewReply(
+                question="병목을 선택하세요.",
+                stage="review",
+                evidence=[],
+                proposed_scope=None,
+                ready_for_review=False,
+                options=[{"id": "approval-wait", "label": "승인 대기"}],
+            )
+        if self.fail:
+            raise InterviewModelError("llm_timeout", "private")
+        return InterviewReply(
+            question="이 범위로 진행할까요?",
+            stage="summary",
+            evidence=[],
+            proposed_scope="review-handoff",
+            ready_for_review=True,
         )
 
     async def propose_design(self, context, catalog):
@@ -266,6 +300,12 @@ def test_concurrent_answer_is_busy_and_only_one_model_call(interview_client_fact
         thread.start()
         assert model.entered.wait(2)
 
+        running = client.get(
+            f"/api/interviews/{session['id']}", headers=headers()
+        )
+        assert running.status_code == 200
+        assert running.json()["session"]["last_operation"]["lease_expired"] is False
+
         competing = client.post(
             f"/api/interviews/{session['id']}/turns",
             headers=headers(),
@@ -396,6 +436,70 @@ def test_failed_operation_can_be_explicitly_retried_without_duplicate_user_turn(
             )
 
 
+def test_choice_retry_reuses_immutable_resolved_answer_without_revalidation(
+    interview_client_factory,
+):
+    from web.api.interviews.models import InterviewTurn
+
+    model = ChoiceRetryModel()
+    client, app = interview_client_factory(model)
+    with client:
+        session = client.post(
+            "/api/interviews",
+            headers=headers(),
+            json={
+                "name": "Review interview",
+                "customer_id": "acme",
+                "consent_version": "2026-09-15",
+                "consent_accepted": True,
+                "request_id": str(uuid4()),
+                "selected_stages": ["review"],
+            },
+        ).json()["session"]
+        question = session["turns"][0]
+        request_id = str(uuid4())
+        payload = {
+            "expected_revision": session["revision"],
+            "request_id": request_id,
+            "choice_answer": {
+                "question_turn_id": question["id"],
+                "option_id": "approval-wait",
+            },
+        }
+        failed = client.post(
+            f"/api/interviews/{session['id']}/turns",
+            headers=headers(),
+            json=payload,
+        )
+        assert failed.status_code == 503
+        with app.state.session_factory.begin() as db:
+            stored_question = db.get(InterviewTurn, question["id"])
+            assert stored_question is not None
+            stored_question.options_json = []
+
+        model.fail = False
+        retried = client.post(
+            f"/api/interviews/{session['id']}/turns",
+            headers=headers(),
+            json=payload,
+        )
+        assert retried.status_code == 200, retried.text
+        assert retried.json()["session"]["turns"][1]["text"] == "승인 대기"
+        assert model.calls[-1].turns[-1].text == "승인 대기"
+        with app.state.session_factory() as db:
+            assert (
+                db.scalar(
+                    select(func.count())
+                    .select_from(InterviewTurn)
+                    .where(
+                        InterviewTurn.session_id == session["id"],
+                        InterviewTurn.role == "user",
+                    )
+                )
+                == 1
+            )
+
+
 def test_abandoned_operation_retry_wins_and_late_completion_is_rejected(
     interview_client_factory,
 ):
@@ -434,6 +538,17 @@ def test_abandoned_operation_retry_wins_and_late_completion_is_rejected(
                 .values(last_operation_lease_expires_at=expired_lease)
             )
 
+        expired = client.get(
+            f"/api/interviews/{session['id']}", headers=headers()
+        )
+        assert expired.status_code == 200
+        assert expired.json()["session"]["last_operation"] == {
+            "request_id": request_id,
+            "kind": "answer",
+            "status": "running",
+            "lease_expired": True,
+        }
+
         retried = client.post(
             f"/api/interviews/{session['id']}/turns",
             headers=headers(),
@@ -444,6 +559,7 @@ def test_abandoned_operation_retry_wins_and_late_completion_is_rejected(
             },
         )
         assert retried.status_code == 200
+        assert model.calls == 3
 
         model.release.set()
         thread.join(5)

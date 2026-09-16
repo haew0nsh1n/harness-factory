@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select, update
 
 from harness_factory import load_json
+from web.acceptance.portal_interview_app import ReviewOnlyFixtureModel
 from web.api.config import Settings
 from web.api.db import Base
 from web.api.designs.models import (
@@ -215,6 +216,7 @@ def seed_interview(
     *,
     organization_id: str = "org-acme",
     scope: str | None = "issue-to-reviewed-pr",
+    selected_stages: list[str] | None = None,
 ) -> InterviewSession:
     now = datetime.now(UTC)
     session = InterviewSession(
@@ -229,6 +231,7 @@ def seed_interview(
         consented_at=now,
         stage="summary",
         selected_scope=scope,
+        selected_stages_json=selected_stages,
         proposed_evidence_json=[
             {
                 "id": str(uuid4()),
@@ -323,6 +326,28 @@ def test_authoritative_catalog_endpoint_is_read_only_and_proposal_is_unapproved(
     }
     assert "Repository permissions are still unknown." in proposal["profile"]["unknowns"]
     assert model.proposal_calls[0][1] == catalog_response.json()["catalog"]
+
+
+def test_generate_rejects_malformed_persisted_scope_before_model_call(proposal_api):
+    client, model, app = proposal_api()
+    session = seed_interview(app, scope="review_bottleneck")
+    request_id = str(uuid4())
+
+    rejected = generate(client, session, request_id)
+
+    assert rejected.status_code == 409
+    assert rejected.json()["code"] == "scope_invalid"
+    assert model.proposal_calls == []
+    with app.state.session_factory() as db:
+        assert (
+            db.scalar(
+                select(InterviewOperation).where(
+                    InterviewOperation.session_id == session.id,
+                    InterviewOperation.request_id == request_id,
+                )
+            )
+            is None
+        )
 
 
 def test_proposal_detail_is_tenant_scoped_expiry_guarded_and_digest_checked(
@@ -424,6 +449,52 @@ def test_invalid_model_catalog_references_are_rejected_not_filtered(
     assert response.json()["code"] == "llm_invalid_result"
     with app.state.session_factory() as db:
         assert db.scalars(select(InterviewProposal)).all() == []
+
+
+def test_proposal_rejects_unselected_sdlc_entries_even_for_fake_model(proposal_api):
+    client, model, app = proposal_api()
+    session = seed_interview(app, selected_stages=["review"])
+
+    response = generate(client, session)
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "llm_invalid_result"
+    assert model.proposal_calls[0][0].selected_stages == ("review",)
+    with app.state.session_factory() as db:
+        assert db.scalars(select(InterviewProposal)).all() == []
+
+
+def test_review_only_browser_fixture_proposal_remains_applyable(proposal_api):
+    fixture_model = ReviewOnlyFixtureModel(ROOT / "examples")
+    candidate = asyncio.run(
+        fixture_model.propose_design(
+            InterviewContext(
+                session_id="fixture-session",
+                revision=1,
+                turns=(),
+                confirmed_evidence=(),
+                stage="review",
+                selected_scope="issue-to-reviewed-pr",
+                selected_stages=("review",),
+            ),
+            {},
+        )
+    )
+    client, _, app = proposal_api(candidate)
+    session = seed_interview(app, selected_stages=["review"])
+
+    proposal_response = generate(client, session)
+
+    assert proposal_response.status_code == 201, proposal_response.text
+    proposal = proposal_response.json()["proposal"]
+    assert [item["stage"] for item in proposal["profile"]["sdlc"]] == ["review"]
+    applied = client.post(
+        f"/api/interviews/{session.id}/apply",
+        headers=headers(),
+        json=apply_payload(proposal),
+    )
+    assert applied.status_code == 200, applied.text
+    assert applied.json()["design"]["workflow"]["id"] == "issue-to-reviewed-pr"
 
 
 def test_model_forged_approval_and_catalog_are_rejected(proposal_api):
@@ -553,6 +624,75 @@ def test_apply_rejects_live_operation_without_invalidating_its_lease(
     model.release.set()
     operation_thread.join(5)
     assert operation_result["status"] in {200, 201}
+
+
+def test_expired_proposal_is_retryable_and_late_owner_cannot_overwrite(
+    proposal_concurrency_api,
+):
+    client, model, app, _ = proposal_concurrency_api
+    session = seed_interview(app)
+    request_id = str(uuid4())
+    payload = {
+        "expected_revision": session.revision,
+        "request_id": request_id,
+    }
+    model.arm("proposal")
+    first_result: dict[str, object] = {}
+    first_thread = Thread(
+        target=post_json,
+        args=(
+            client,
+            f"/api/interviews/{session.id}/proposals",
+            payload,
+            first_result,
+        ),
+    )
+    first_thread.start()
+    assert model.entered.wait(2)
+
+    expired_lease = datetime.now(UTC) - timedelta(seconds=1)
+    with app.state.session_factory.begin() as db:
+        db.execute(
+            update(InterviewOperation)
+            .where(
+                InterviewOperation.session_id == session.id,
+                InterviewOperation.request_id == request_id,
+            )
+            .values(lease_expires_at=expired_lease)
+        )
+        db.execute(
+            update(InterviewSession)
+            .where(InterviewSession.id == session.id)
+            .values(last_operation_lease_expires_at=expired_lease)
+        )
+
+    expired = client.get(
+        f"/api/interviews/{session.id}", headers=headers()
+    )
+    assert expired.status_code == 200
+    assert expired.json()["session"]["last_operation"]["lease_expired"] is True
+
+    model.block = None
+    retried = client.post(
+        f"/api/interviews/{session.id}/proposals",
+        headers=headers(),
+        json=payload,
+    )
+    assert retried.status_code == 201, retried.text
+    assert len(model.proposal_calls) == 1
+
+    model.release.set()
+    first_thread.join(5)
+    assert first_result["status"] == 409
+    assert first_result["body"]["code"] == "operation_superseded"
+    with app.state.session_factory() as db:
+        assert len(
+            db.scalars(
+                select(InterviewProposal).where(
+                    InterviewProposal.session_id == session.id
+                )
+            ).all()
+        ) == 1
 
 
 def test_apply_cas_rejects_operation_claimed_after_session_read(

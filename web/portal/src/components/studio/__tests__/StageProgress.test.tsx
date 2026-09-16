@@ -22,4 +22,20 @@ describe("StageProgress", () => {
     expect(screen.getByText("인터뷰 단계 미제공")).toBeInTheDocument();
     expect(screen.queryByLabelText("현재 단계")).not.toBeInTheDocument();
   });
+
+  test("shows only the selected SDLC stages and treats summary as terminal", () => {
+    render(
+      <StageProgress
+        stage="summary"
+        selectedStages={["planning", "implementation", "review"]}
+      />,
+    );
+
+    expect(screen.queryByText("발견")).not.toBeInTheDocument();
+    expect(screen.getByText("계획")).toBeInTheDocument();
+    expect(screen.getByText("구현")).toBeInTheDocument();
+    expect(screen.getByText("검토")).toBeInTheDocument();
+    expect(screen.queryByText("테스트")).not.toBeInTheDocument();
+    expect(screen.getByText("선택한 단계 완료")).toBeInTheDocument();
+  });
 });
