@@ -80,6 +80,44 @@ def test_skill_resource_hashes_include_nested_bundle_named_resources(tmp_path: P
     ).hexdigest()
 
 
+@pytest.mark.parametrize("relative", ["__pycache__/note.txt", "compiled.pyc"])
+def test_skill_resource_hashes_reject_cache_resources(
+    tmp_path: Path, relative: str
+) -> None:
+    skill = make_bundle(tmp_path)
+    resource = skill / relative
+    resource.parent.mkdir(parents=True, exist_ok=True)
+    resource.write_bytes(b"cache")
+
+    with pytest.raises(ValidationError, match="cache"):
+        skill_resource_hashes(skill)
+
+
+@pytest.mark.parametrize("relative", ["__pycache__/note.txt", "compiled.pyc"])
+def test_validate_skill_bundle_rejects_manifested_cache_resources(
+    tmp_path: Path, relative: str
+) -> None:
+    skill = make_bundle(tmp_path)
+    resource = skill / relative
+    resource.parent.mkdir(parents=True, exist_ok=True)
+    resource.write_bytes(b"cache")
+    manifest_path = skill / "bundle.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["resources"][relative] = hashlib.sha256(b"cache").hexdigest()
+    payload = {
+        "schema_version": 2,
+        "skill_id": "worker",
+        "resources": manifest["resources"],
+    }
+    manifest["digest"] = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValidationError, match="cache"):
+        validate_skill_bundle(skill, "worker")
+
+
 def test_skill_bundle_digest_is_canonical_across_resource_mapping_order() -> None:
     resources = {
         "templates/report.md": "c" * 64,

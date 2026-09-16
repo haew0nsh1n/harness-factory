@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 import subprocess
@@ -15,6 +16,25 @@ class PackageCase(FixtureCase):
         return generate_package(
             self.profile, self.workflow, self.scenarios, self.catalog, self.root, self.package
         )
+
+    def add_manifested_worker_resource(self, relative):
+        resource = self.root / "skills/worker" / relative
+        resource.parent.mkdir(parents=True, exist_ok=True)
+        resource.write_bytes(b"cache")
+        manifest_path = self.root / "skills/worker/bundle.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["resources"][relative] = hashlib.sha256(b"cache").hexdigest()
+        payload = {
+            "schema_version": 2,
+            "skill_id": "worker",
+            "resources": manifest["resources"],
+        }
+        manifest["digest"] = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        manifest_path.write_text(json.dumps(manifest))
+        self.evidence["bundles"]["worker"] = manifest["digest"]
+        (self.root / "evidence.json").write_text(json.dumps(self.evidence))
 
 
 class PackageTests(PackageCase):
@@ -109,6 +129,20 @@ class PackageTests(PackageCase):
     def test_symlink_resource_rejected_before_generation(self):
         (self.root / "skills/worker/link").symlink_to(self.root / "license.txt")
         with self.assertRaises(HarnessError):
+            self.generate()
+        self.assertFalse(self.package.exists())
+
+    def test_pycache_directory_rejected_before_generation(self):
+        self.add_manifested_worker_resource("__pycache__/note.txt")
+
+        with self.assertRaisesRegex(HarnessError, "invalid cache resource"):
+            self.generate()
+        self.assertFalse(self.package.exists())
+
+    def test_pyc_file_rejected_before_generation(self):
+        self.add_manifested_worker_resource("compiled.pyc")
+
+        with self.assertRaisesRegex(HarnessError, "invalid cache resource"):
             self.generate()
         self.assertFalse(self.package.exists())
 
