@@ -139,9 +139,9 @@ export function WorkflowForm({
 
       <section className="dependency-preview" aria-label={t("workflowForm.dependencyAria")}>
         <strong>{t("workflowForm.dependencyTitle")}</strong>
-        {analysis.edges.length === 0 ? <p className="muted">{t("workflowForm.noEdges")}</p> : (
-          <ul>{analysis.edges.map((edge, index) => <li key={`${edge.from}-${edge.to}-${index}`}><code>{edge.from}</code> → <code>{edge.to}</code></li>)}</ul>
-        )}
+        {analysis.missing.length === 0 && analysis.cycles.length === 0 ? (
+          <p className="muted">{t("workflowForm.dependencyOk")}</p>
+        ) : null}
         {analysis.missing.map((item) => <p className="error-text" key={`${item.stepId}-${item.dependencyId}`}>{t("workflowForm.missingNode", { stepId: item.stepId, dependencyId: item.dependencyId })}</p>)}
         {analysis.cycles.map((cycle) => <p className="error-text" key={cycle.join("-")}>{t("workflowForm.cycle", { cycle: cycle.join(" → ") })}</p>)}
       </section>

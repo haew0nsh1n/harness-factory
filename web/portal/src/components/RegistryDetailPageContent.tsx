@@ -253,6 +253,15 @@ export function RegistryDetailPageContent({
                 status: t(approvalStatusKey(selectedVersion)),
               })}
             </p>
+            <p>
+              <a
+                className="download-link"
+                href={`/api/control-plane/registry/versions/${selectedVersion.id}/artifact`}
+                download
+              >
+                {t("registryDetail.downloadArtifact")}
+              </a>
+            </p>
           </>
         ) : (
           <p className="muted">{t("registryDetail.noSelectedVersion")}</p>

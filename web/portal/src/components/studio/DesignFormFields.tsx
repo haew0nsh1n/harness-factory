@@ -229,11 +229,13 @@ export function ObjectListSection({
 
 export function NestedCard({
   title,
+  subtitle,
   removeLabel,
   onRemove,
   children,
 }: {
   title: string;
+  subtitle?: ReactNode;
   removeLabel: string;
   onRemove: () => void;
   children: ReactNode;
@@ -241,7 +243,10 @@ export function NestedCard({
   const t = useTranslations();
   return (
     <fieldset className="nested-card">
-      <legend>{title}</legend>
+      <legend>
+        <span className="nested-title">{title}</span>
+        {subtitle ? <span className="nested-subtitle">{subtitle}</span> : null}
+      </legend>
       <div className="nested-card-fields">{children}</div>
       <button
         className="button-secondary button-compact"
