@@ -17,7 +17,7 @@
   "approved": {"by": "consultant", "at": "2026-09-10T08:30:00+09:00"},
   "steps": [
     {
-      "id": "clarify",ㅆ는 
+      "id": "clarify",
       "name": "Clarify acceptance criteria",
       "skill": "hf-clarify",
       "needs": [],
