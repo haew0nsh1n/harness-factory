@@ -1034,10 +1034,9 @@ export function InterviewPageContent({
             authoritativeCatalog={proposal.catalog}
             onChange={setProposalDraft}
             readOnly
-            findings={proposal.findings.map((finding) =>
-              Object.entries(finding)
-                .map(([key, value]) => `${key}: ${value}`)
-                .join(" · "),
+            findings={proposal.findings.map(
+              (finding) =>
+                `${finding.field ?? ""}: ${finding.code ?? ""}: ${finding.message ?? ""}`,
             )}
           />
           <section className="workspace-panel apply-panel">

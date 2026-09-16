@@ -230,6 +230,8 @@ module api 'container-app.bicep' = {
     env: concat(backendEnv, openAiEnv)
     secrets: backendSecrets
     command: apiCommand
+    volumes: artifactVolumes
+    volumeMounts: artifactMounts
     minReplicas: 1
     maxReplicas: 1
   }
@@ -251,6 +253,8 @@ module worker 'container-app.bicep' = {
     env: concat(backendEnv, openAiEnv)
     secrets: backendSecrets
     command: workerCommand
+    volumes: artifactVolumes
+    volumeMounts: artifactMounts
     minReplicas: 1
     maxReplicas: 1
   }

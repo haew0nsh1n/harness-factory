@@ -336,6 +336,154 @@ button {
   letter-spacing: -0.07em;
 }
 
+.attention-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.attention-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem;
+  border: 1px solid var(--hf-border);
+  border-left: 4px solid var(--hf-border);
+  border-radius: 8px;
+  background: var(--hf-surface);
+}
+
+.attention-value {
+  font-family: var(--hf-display);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.attention-label {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.attention-hint {
+  color: var(--hf-muted);
+  font-size: 0.75rem;
+}
+
+.attention-error {
+  border-left-color: var(--hf-error-fg);
+}
+
+.attention-warn {
+  border-left-color: var(--hf-warning-fg);
+}
+
+.attention-info {
+  border-left-color: var(--hf-action);
+}
+
+.attention-muted {
+  border-left-color: #94a3b8;
+}
+
+.pipeline-bar {
+  display: flex;
+  height: 16px;
+  margin-top: 0.5rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--hf-canvas);
+}
+
+.pipeline-seg {
+  height: 100%;
+}
+
+.pipeline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+}
+
+.pipeline-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--hf-muted);
+}
+
+.pipeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.pipeline-draft {
+  background: #94a3b8;
+}
+
+.pipeline-validated {
+  background: #2563eb;
+}
+
+.pipeline-approved {
+  background: #0891b2;
+}
+
+.pipeline-build-queued {
+  background: #d97706;
+}
+
+.pipeline-built {
+  background: #16a34a;
+}
+
+.pipeline-failed {
+  background: #dc2626;
+}
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--hf-border);
+}
+
+.recent-item:last-child {
+  border-bottom: 0;
+}
+
+.recent-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  color: var(--hf-action);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-time {
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
 .page-header,
 .section-header {
   display: flex;

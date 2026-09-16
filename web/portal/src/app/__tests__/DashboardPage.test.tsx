@@ -74,10 +74,10 @@ describe("DashboardPageContent", () => {
     const validatedCard = await screen.findByRole("heading", { name: "검증됨" });
     expect(validatedCard).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByText("검증됨")).toBeInTheDocument();
-      expect(screen.getByText("승인됨")).toBeInTheDocument();
-      expect(screen.getByText("빌드 완료")).toBeInTheDocument();
-      expect(screen.getByText("게시됨")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "검증됨" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "승인됨" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "빌드 완료" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "게시됨" })).toBeInTheDocument();
     });
     expect(within(validatedCard.closest("section") as HTMLElement).getByText("1")).toBeInTheDocument();
     expect(
