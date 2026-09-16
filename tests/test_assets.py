@@ -72,6 +72,25 @@ class AssetTests(unittest.TestCase):
                     )
                     self.assertEqual(report["bundles"][row["id"]], bundle["digest"])
 
+    def test_actual_evidence_covers_required_behavior_classes(self):
+        report = load_json(self.catalog_root / "evidence/copilot-behavior.json")
+        required = {
+            "success",
+            "ambiguous-input",
+            "approval-refusal",
+            "missing-access",
+            "failed-check",
+            "resume",
+            "uncertain-write",
+            "instruction-injection",
+        }
+        self.assertTrue(required.issubset(set(report["behavior_classes"])))
+        for skill in self.catalog["skills"]:
+            bundle = validate_skill_bundle(
+                self.catalog_root / skill["path"], skill["id"]
+            )
+            self.assertEqual(report["bundles"][skill["id"]], bundle["digest"])
+
     def test_curated_reference_index_is_pinned_hashed_and_reviewed(self):
         index = load_json(ROOT / "catalog/references/index.json")
         self.assertEqual(set(index), {"schema_version", "references"})

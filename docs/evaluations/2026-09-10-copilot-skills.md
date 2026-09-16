@@ -2,6 +2,10 @@
 
 Date: 2026-09-10
 
+> Historical baseline only. These observations are bound to the original
+> `SKILL.md` hashes and do not verify the multi-resource bundles introduced on
+> 2026-09-16.
+
 ## Method and boundary
 
 A Copilot CLI subagent read the actual five adapted catalog skills and factory
@@ -11,12 +15,15 @@ read-only file access was used; no customer credentials or live operations were
 available. A focused rerun evaluated two clarified approval cases.
 
 This is observed bounded agent behavior, not a static prompt checklist. It is
-also not proof of production execution, tool interoperability, or reliable
-permission enforcement. Catalog `verified` means this bounded Copilot
-simulation passed; each generated customer workflow still requires evaluation.
+also not proof of production execution, tool interoperability, reliable
+permission enforcement, or any later skill bytes. Each generated customer
+workflow still requires its own evaluation.
 
-The evaluated catalog file hashes and outcomes are recorded in
-[`catalog/evidence/copilot-behavior.json`](../../catalog/evidence/copilot-behavior.json).
+The original file hashes, outcomes, and missing-metadata limitations are
+preserved in
+[`catalog/evidence/skill-quality-baseline.json`](../../catalog/evidence/skill-quality-baseline.json).
+A later mechanical evidence-schema migration did not rerun these cases and must
+not be treated as proof for a new bundle digest.
 
 ## Observations
 
@@ -60,3 +67,7 @@ Run generated-package integrity checks, evaluate customer-specific scenarios in
 a read-only context, and perform preflight on the actual customer machine.
 Authentication checks on the consultant machine are not evidence of customer
 access. No evaluation result here certifies write permission or deployment.
+
+The replacement comparison against the final six 2026-09-16 bundles is tracked
+separately in
+[`2026-09-16-reference-backed-skills.md`](2026-09-16-reference-backed-skills.md).
