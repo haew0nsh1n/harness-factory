@@ -5,6 +5,7 @@ import { useId, useRef, useState } from "react";
 
 import { EvidenceRail } from "@/components/studio/EvidenceRail";
 import { StageProgress } from "@/components/studio/StageProgress";
+import { useTranslations } from "@/i18n/I18nProvider";
 
 export interface EvidenceItem {
   id: string;
@@ -33,8 +34,10 @@ export function InterviewWorkspace({
   conversation,
   composer,
   onConfirm,
-  boundary = "대화와 근거는 저장된 인터뷰 상태를 그대로 표시합니다.",
+  boundary,
 }: InterviewWorkspaceProps) {
+  const t = useTranslations();
+  const displayBoundary = boundary ?? t("interviewWorkspace.boundary");
   const [activeTab, setActiveTab] = useState<MobileRailTab>("evidence");
   const tabListId = useId();
   const evidencePanelId = `${tabListId}-evidence-panel`;
@@ -64,10 +67,10 @@ export function InterviewWorkspace({
     <section className="interview-workspace" aria-labelledby={`${tabListId}-title`}>
       <header className="interview-workspace-header">
         <div>
-          <p className="eyebrow">Evidence workspace</p>
+          <p className="eyebrow">{t("interviewWorkspace.eyebrow")}</p>
           <h2 id={`${tabListId}-title`}>{title}</h2>
         </div>
-        <p className="workspace-boundary">{boundary}</p>
+        <p className="workspace-boundary">{displayBoundary}</p>
       </header>
 
       <div className="interview-workspace-grid">
@@ -77,12 +80,12 @@ export function InterviewWorkspace({
           <div className="conversation-surface">{conversation}</div>
         </div>
 
-        <aside className="evidence-column" aria-label="설계 근거">
+        <aside className="evidence-column" aria-label={t("interviewWorkspace.evidenceAria")}>
           <EvidenceRail items={evidence} onConfirm={onConfirm} />
         </aside>
 
         <div className="mobile-evidence-column">
-          <div className="workspace-tabs" role="tablist" aria-label="설계 근거 보기">
+          <div className="workspace-tabs" role="tablist" aria-label={t("interviewWorkspace.evidenceTabsAria")}>
             <button
               ref={evidenceTabRef}
               id={`${tabListId}-evidence-tab`}
@@ -94,7 +97,7 @@ export function InterviewWorkspace({
               onClick={() => selectTab("evidence")}
               onKeyDown={handleTabKeyDown}
             >
-              근거
+              {t("interviewWorkspace.evidenceTab")}
             </button>
             <button
               ref={proposalTabRef}
@@ -107,7 +110,7 @@ export function InterviewWorkspace({
               onClick={() => selectTab("proposal")}
               onKeyDown={handleTabKeyDown}
             >
-              제안
+              {t("interviewWorkspace.proposalTab")}
             </button>
           </div>
           <div

@@ -162,34 +162,43 @@ def main(argv: list[str] | None = None) -> int:
         with session_scope() as session:
             result = bootstrap_development_tenant(session, settings)
             if args.with_sample_designs:
-                samples = seed_sample_designs(
-                    session,
-                    organization_id=settings.development_organization_id,
-                    actor_id=settings.development_subject_id,
-                )
-                result["sample_designs"] = [
-                    {
-                        "id": sample.design_id,
-                        "template": sample.template_key,
-                        "created": sample.created,
-                    }
-                    for sample in samples
-                ]
-                registry_samples = seed_sample_registry(
-                    session,
-                    organization_id=settings.development_organization_id,
-                    actor_id=settings.development_subject_id,
-                    artifact_root=settings.artifact_root,
-                )
-                result["sample_registry"] = [
-                    {
-                        "asset_id": sample.asset_id,
-                        "created": sample.created,
-                        "template": sample.template_key,
-                        "version_id": sample.version_id,
-                    }
-                    for sample in registry_samples
-                ]
+                sample_designs: list[dict[str, object]] = []
+                sample_registry: list[dict[str, object]] = []
+                for language in ("ko", "en"):
+                    samples = seed_sample_designs(
+                        session,
+                        organization_id=settings.development_organization_id,
+                        actor_id=settings.development_subject_id,
+                        language=language,
+                    )
+                    sample_designs.extend(
+                        {
+                            "id": sample.design_id,
+                            "template": sample.template_key,
+                            "language": language,
+                            "created": sample.created,
+                        }
+                        for sample in samples
+                    )
+                    registry_samples = seed_sample_registry(
+                        session,
+                        organization_id=settings.development_organization_id,
+                        actor_id=settings.development_subject_id,
+                        artifact_root=settings.artifact_root,
+                        language=language,
+                    )
+                    sample_registry.extend(
+                        {
+                            "asset_id": sample.asset_id,
+                            "created": sample.created,
+                            "template": sample.template_key,
+                            "language": language,
+                            "version_id": sample.version_id,
+                        }
+                        for sample in registry_samples
+                    )
+                result["sample_designs"] = sample_designs
+                result["sample_registry"] = sample_registry
     except (
         DevelopmentBootstrapNotAllowed,
         DevelopmentBootstrapInvalid,

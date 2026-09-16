@@ -78,6 +78,14 @@ class Asset(Base):
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     slug: Mapped[str] = mapped_column(String(120), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    language: Mapped[str] = mapped_column(
+        String(8),
+        nullable=False,
+        default="ko",
+        server_default="ko",
+        index=True,
+    )
+    description: Mapped[str | None] = mapped_column(String(500))
     description: Mapped[str | None] = mapped_column(String(500))
     owner_subject_id: Mapped[str] = mapped_column(String(80), nullable=False)
     visibility: Mapped[str] = mapped_column(

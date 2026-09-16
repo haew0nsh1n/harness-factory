@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "customer_id": "fictional-code-review",
+  "name": "Fictional customer - code review sample",
+  "sdlc": [
+    {"stage": "review", "current": "Change intent and test evidence are separated, causing review gaps.", "desired": "Read the implementation and the real test results together and report important defects with evidence."}
+  ],
+  "glossary": {
+    "implementation": "The local changes to review and their intent",
+    "review-report": "A read-only report distinguishing requirements, defects, test evidence, and unverified items"
+  },
+  "systems": [
+    {"id": "issue-store", "kind": "git-markdown-issue-tracker", "tool": "git", "capabilities": ["issue-read"]}
+  ],
+  "issue_tracker": {
+    "system_id": "issue-store",
+    "provider": "markdown",
+    "connection": "local",
+    "project": "fictional-project",
+    "path": "issues",
+    "skill": null,
+    "mcp": null,
+    "capabilities": ["issue-read"]
+  },
+  "roles": ["consultant", "engineer", "reviewer"],
+  "pains": [
+    {"description": "Review stays at surface checks and misses important behavior errors.", "impact": "Fixes are delayed and re-review is needed.", "frequency": "Fictional example; the real frequency is not verified."}
+  ],
+  "success_criteria": [
+    "Important findings include the file location, impact, and reproduction evidence.",
+    "Do not invent test results that were not provided."
+  ],
+  "constraints": [
+    "This is fictional customer information; the real repository rules and branches are not verified.",
+    "The review is read-only and does not auto-fix, publish, approve, or merge."
+  ],
+  "facts": [
+    {"id": "fictional-source", "statement": "The sample content is fictional material used to illustrate product behavior.", "evidence": "Development fixture included in the repository"}
+  ],
+  "assumptions": ["At run time the implementation and test-results are provided together."],
+  "unknowns": ["The real severity criteria and required regression tests are not verified."]
+}

@@ -6,6 +6,7 @@ import { DesignDocumentReview } from "@/components/studio/DesignDocumentReview";
 import { ProfileForm } from "@/components/studio/ProfileForm";
 import { ScenarioForm } from "@/components/studio/ScenarioForm";
 import { WorkflowForm } from "@/components/studio/WorkflowForm";
+import { useTranslations } from "@/i18n/I18nProvider";
 import {
   validateDesignFormDocuments,
   type DesignFormErrors,
@@ -64,12 +65,13 @@ function FindingBlock({
   findings: string[];
   prefix: string;
 }) {
+  const t = useTranslations();
   const matches = documentFindings(findings, prefix);
   if (matches.length === 0) {
     return null;
   }
   return (
-    <div className="mapped-findings" aria-label={`${prefix} 검증 결과`}>
+    <div className="mapped-findings" aria-label={t("structuredEditors.findingAria", { prefix })}>
       {matches.map((finding) => (
         <pre className="finding-text" key={finding}>
           {finding}
@@ -86,13 +88,14 @@ function ReadOnlyDocument({
   label: string;
   document: JsonDocument;
 }) {
+  const t = useTranslations();
   return (
     <section className="workspace-panel structured-editor">
-      <p className="eyebrow">전체 문서 검토</p>
+      <p className="eyebrow">{t("structuredEditors.fullReview")}</p>
       <h2>{label}</h2>
       <textarea
         className="readonly-json readonly-json-textarea"
-        aria-label={`${label} 전체 JSON 검토`}
+        aria-label={t("structuredEditors.fullJsonAria", { label })}
         value={JSON.stringify(document, null, 2)}
         readOnly
         rows={18}
@@ -111,13 +114,15 @@ export function StructuredDesignEditors({
   readOnly = false,
   onTransientStateChange,
 }: StructuredDesignEditorsProps) {
+  const t = useTranslations();
   const computedErrors = useMemo(
     () =>
       validateDesignFormDocuments(
         documents,
         authoritativeCatalog ?? documents.catalog,
+        t,
       ),
-    [authoritativeCatalog, documents],
+    [authoritativeCatalog, documents, t],
   );
   const errors = suppliedErrors ?? computedErrors;
   const displayedErrors = useMemo(
@@ -128,20 +133,17 @@ export function StructuredDesignEditors({
   if (readOnly) {
     return (
       <div className="structured-editors">
-        <p className="readonly-notice">
-          이 제안은 다이제스트 검토용 읽기 전용입니다. 먼저 사람이 읽을 수 있는
-          검토 내용을 확인하고, 원문이 필요할 때만 디버그 JSON을 여세요.
-        </p>
+        <p className="readonly-notice">{t("structuredEditors.readOnlyNotice")}</p>
         <DesignDocumentReview documents={documents} />
         <DebugJsonDisclosure>
-          <ReadOnlyDocument label="프로필" document={documents.profile} />
-          <ReadOnlyDocument label="워크플로" document={documents.workflow} />
-          <ReadOnlyDocument label="시나리오" document={documents.scenarios} />
-          <ReadOnlyDocument label="승인 카탈로그" document={documents.catalog} />
+          <ReadOnlyDocument label={t("structuredEditors.profile")} document={documents.profile} />
+          <ReadOnlyDocument label={t("structuredEditors.workflow")} document={documents.workflow} />
+          <ReadOnlyDocument label={t("structuredEditors.scenarios")} document={documents.scenarios} />
+          <ReadOnlyDocument label={t("structuredEditors.approvalCatalog")} document={documents.catalog} />
         </DebugJsonDisclosure>
         {findings.length > 0 ? (
-          <section className="workspace-panel" aria-label="원문 검증 결과">
-            <p className="eyebrow">원문 검증 결과</p>
+          <section className="workspace-panel" aria-label={t("structuredEditors.rawFindings")}>
+            <p className="eyebrow">{t("structuredEditors.rawFindings")}</p>
             {findings.map((finding) => (
               <pre className="finding-text" key={finding}>
                 {finding}
@@ -196,21 +198,21 @@ export function StructuredDesignEditors({
         documentTypes={["catalog"]}
       />
       <DebugJsonDisclosure
-        label="카탈로그 원문 JSON"
-        hint="현재 서버 승인본과 이 설계에 저장된 스냅샷을 구분해 확인합니다."
+        label={t("structuredEditors.catalogRawLabel")}
+        hint={t("structuredEditors.catalogRawHint")}
       >
         <ReadOnlyDocument
-          label="현재 서버 승인 카탈로그"
+          label={t("structuredEditors.currentServerCatalog")}
           document={authoritativeCatalog ?? documents.catalog}
         />
         <ReadOnlyDocument
-          label="설계에 저장된 카탈로그 스냅샷"
+          label={t("structuredEditors.savedCatalogSnapshot")}
           document={documents.catalog}
         />
       </DebugJsonDisclosure>
       {unplacedFindings.length > 0 ? (
-        <section className="workspace-panel" aria-label="매핑되지 않은 검증 결과">
-          <p className="eyebrow">원문 검증 결과</p>
+        <section className="workspace-panel" aria-label={t("structuredEditors.unmappedAria")}>
+          <p className="eyebrow">{t("structuredEditors.rawFindings")}</p>
           {unplacedFindings.map((finding) => (
             <pre className="finding-text" key={finding}>
               {finding}

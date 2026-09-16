@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "test-first-implementation",
+  "name": "Test-first implementation",
+  "customer_id": "fictional-test-first-implementation",
+  "goal": "Implement the approved plan as small test-first changes and leave observed test evidence.",
+  "trigger": "An owner hands off an approved plan as the implementation target.",
+  "inputs": ["plan"],
+  "outputs": ["implementation", "test-results"],
+  "customer_rules": [
+    "Observe the failing test first and confirm the failure reason links to a requirement.",
+    "Change only the minimal code needed, then run the same test and related regression tests.",
+    "Do not record tests as passing if they were not run or their results were lost.",
+    "External publishing, PR creation, merging, and deployment are outside this workflow's scope."
+  ],
+  "approved": {"by": "fictional-fixture-author-not-customer-approval", "at": "2026-09-16T00:00:00+09:00"},
+  "steps": [
+    {
+      "id": "implement",
+      "name": "Implement with red-green-refactor",
+      "skill": "hf-tdd",
+      "needs": [],
+      "inputs": ["plan"],
+      "outputs": ["implementation", "test-results"],
+      "tools": [],
+      "effect": "local",
+      "approval": false,
+      "approver": "",
+      "completion": "The implementation within the plan scope and the real failing, passing, and regression test results are all recorded.",
+      "failure": "If a test fails or cannot run, record the command and observed result and stop as failed or blocked.",
+      "manual": null
+    }
+  ],
+  "traceability": [
+    {"requirement": "Implement only the approved plan.", "steps": ["implement"], "checks": ["Do not add changes absent from the plan before separate approval.", "Do not start without an input plan."]},
+    {"requirement": "Leave test results as observed facts.", "steps": ["implement"], "checks": ["Red and green results are recorded with their commands.", "Regression tests that could not run remain unverified."]}
+  ]
+}

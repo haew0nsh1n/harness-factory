@@ -18,13 +18,13 @@ describe("JsonEditor", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("워크플로 JSON"), {
+    fireEvent.change(screen.getByLabelText("워크플로우 JSON"), {
       target: { value: "{not-json" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "워크플로 저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "워크플로우 저장" }));
 
     expect(onSave).not.toHaveBeenCalled();
-    expect(screen.getByText(/워크플로 JSON이 올바르지 않습니다:/i)).toBeInTheDocument();
+    expect(screen.getByText(/워크플로우 JSON이 올바르지 않습니다:/i)).toBeInTheDocument();
   });
 
   test("never renders password or token fields", () => {

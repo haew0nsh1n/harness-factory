@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from harness_factory import load_json, validate, validate_scenarios
 from web.api.designs.digest import canonical_json_bytes, design_digest
+from web.api.designs.models import CONTENT_LANGUAGE_DEFAULT, CONTENT_LANGUAGES
 from web.api.designs.repository import ensure_sqlite_write_transaction
 from web.api.organizations.models import Organization
 from web.api.registry.models import Asset, AssetVersion
@@ -49,22 +50,36 @@ class _Sample:
     artifact: bytes
 
 
-def sample_asset_id(organization_id: str, template_key: str) -> str:
+def sample_asset_id(
+    organization_id: str, template_key: str, language: str = CONTENT_LANGUAGE_DEFAULT
+) -> str:
+    suffix = "" if language == CONTENT_LANGUAGE_DEFAULT else f":{language}"
     return str(
         uuid5(
             SAMPLE_REGISTRY_NAMESPACE,
-            f"{organization_id}:{template_key}:asset",
+            f"{organization_id}:{template_key}{suffix}:asset",
         )
     )
 
 
-def sample_version_id(organization_id: str, template_key: str) -> str:
+def sample_version_id(
+    organization_id: str, template_key: str, language: str = CONTENT_LANGUAGE_DEFAULT
+) -> str:
+    suffix = "" if language == CONTENT_LANGUAGE_DEFAULT else f":{language}"
     return str(
         uuid5(
             SAMPLE_REGISTRY_NAMESPACE,
-            f"{organization_id}:{template_key}:{SAMPLE_VERSION}",
+            f"{organization_id}:{template_key}{suffix}:{SAMPLE_VERSION}",
         )
     )
+
+
+def sample_slug(
+    template_key: str, language: str = CONTENT_LANGUAGE_DEFAULT
+) -> str:
+    if language == CONTENT_LANGUAGE_DEFAULT:
+        return template_key
+    return f"{template_key}-{language}"
 
 
 def seed_sample_registry(
@@ -73,7 +88,10 @@ def seed_sample_registry(
     organization_id: str,
     actor_id: str,
     artifact_root: Path,
+    language: str = CONTENT_LANGUAGE_DEFAULT,
 ) -> list[SampleRegistrySeedResult]:
+    if language not in CONTENT_LANGUAGES:
+        raise SampleRegistrySeedInvalid(f"unsupported sample language: {language}")
     ensure_sqlite_write_transaction(session)
     organization = session.scalar(
         select(Organization)
@@ -91,11 +109,12 @@ def seed_sample_registry(
 
     results = []
     for template_key in SAMPLE_TEMPLATE_KEYS:
-        sample = _load_sample(template_key)
-        asset_id = sample_asset_id(organization_id, template_key)
-        version_id = sample_version_id(organization_id, template_key)
+        sample = _load_sample(template_key, language)
+        slug = sample_slug(template_key, language)
+        asset_id = sample_asset_id(organization_id, template_key, language)
+        version_id = sample_version_id(organization_id, template_key, language)
         artifact_key = (
-            f"organizations/{organization_id}/samples/{template_key}/"
+            f"organizations/{organization_id}/samples/{slug}/"
             f"{SAMPLE_VERSION}/package.tar"
         )
         artifact_digest = hashlib.sha256(sample.artifact).hexdigest()
@@ -109,7 +128,7 @@ def seed_sample_registry(
             "schema_version": 1,
             "asset": {
                 "type": "workflow",
-                "slug": template_key,
+                "slug": slug,
             },
             "version": SAMPLE_VERSION,
             "runtime": "copilot-cli",
@@ -132,7 +151,8 @@ def seed_sample_registry(
             session,
             organization_id=organization_id,
             actor_id=actor_id,
-            template_key=template_key,
+            slug=slug,
+            language=language,
             asset_id=asset_id,
             version_id=version_id,
             name=str(sample.workflow["name"]),
@@ -157,9 +177,13 @@ def _repository_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
-def _load_sample(template_key: str) -> _Sample:
+def _load_sample(
+    template_key: str, language: str = CONTENT_LANGUAGE_DEFAULT
+) -> _Sample:
     root = _repository_root()
     fixture_root = root / "examples" / "sample-workflows" / template_key
+    if language != CONTENT_LANGUAGE_DEFAULT:
+        fixture_root = fixture_root / language
     catalog_path = root / "catalog" / "catalog.json"
     profile = load_json(fixture_root / "profile.json")
     workflow = load_json(fixture_root / "workflow.json")
@@ -243,7 +267,8 @@ def _insert_or_validate(
     *,
     organization_id: str,
     actor_id: str,
-    template_key: str,
+    slug: str,
+    language: str,
     asset_id: str,
     version_id: str,
     name: str,
@@ -260,7 +285,7 @@ def _insert_or_validate(
             asset,
             version,
             organization_id=organization_id,
-            template_key=template_key,
+            slug=slug,
             asset_id=asset_id,
             version_id=version_id,
             manifest_digest=manifest_digest,
@@ -276,8 +301,9 @@ def _insert_or_validate(
                     id=asset_id,
                     organization_id=organization_id,
                     kind="workflow",
-                    slug=template_key,
+                    slug=slug,
                     name=name,
+                    language=language,
                     description=description,
                     owner_subject_id=actor_id,
                     visibility="internal",
@@ -309,7 +335,7 @@ def _insert_or_validate(
             asset,
             version,
             organization_id=organization_id,
-            template_key=template_key,
+            slug=slug,
             asset_id=asset_id,
             version_id=version_id,
             manifest_digest=manifest_digest,
@@ -324,7 +350,7 @@ def _validate_existing(
     version: AssetVersion | None,
     *,
     organization_id: str,
-    template_key: str,
+    slug: str,
     asset_id: str,
     version_id: str,
     manifest_digest: str,
@@ -337,7 +363,7 @@ def _validate_existing(
         and asset.id == asset_id
         and asset.organization_id == organization_id
         and asset.kind == "workflow"
-        and asset.slug == template_key
+        and asset.slug == slug
         and version.id == version_id
         and version.organization_id == organization_id
         and version.asset_id == asset_id
@@ -350,5 +376,5 @@ def _validate_existing(
     )
     if not valid:
         raise SampleRegistrySeedInvalid(
-            f"sample registry identity collision: {template_key}"
+            f"sample registry identity collision: {slug}"
         )

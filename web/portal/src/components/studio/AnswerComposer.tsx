@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { useTranslations } from "@/i18n/I18nProvider";
 import type { InterviewTurn } from "@/lib/types";
 
 interface AnswerComposerProps {
@@ -29,6 +30,7 @@ export function AnswerComposer({
   onSendChoice,
   onRetry,
 }: AnswerComposerProps) {
+  const t = useTranslations();
   const [selection, setSelection] = useState<AnswerSelection>({
     mode: "custom",
   });
@@ -55,9 +57,9 @@ export function AnswerComposer({
     <div className="answer-composer">
       {question && options.length > 0 ? (
         <fieldset className="answer-options">
-          <legend>AI 제안</legend>
-          <p>제안은 사실이 아닙니다. 내용을 확인한 뒤 선택하거나 직접 답변하세요.</p>
-          <div className="choice-grid" role="radiogroup" aria-label="AI 제안 답변">
+          <legend>{t("answerComposer.aiSuggestion")}</legend>
+          <p>{t("answerComposer.suggestionNote")}</p>
+          <div className="choice-grid" role="radiogroup" aria-label={t("answerComposer.aiSuggestionAria")}>
             {options.map((option) => (
               <label className="choice-control answer-option" key={option.id}>
                 <input
@@ -86,7 +88,7 @@ export function AnswerComposer({
                   disabled={busy}
                   onChange={() => setSelection({ mode: "custom" })}
                 />
-                <span>직접 입력</span>
+                <span>{t("answerComposer.customInput")}</span>
               </label>
             ) : null}
           </div>
@@ -94,20 +96,20 @@ export function AnswerComposer({
       ) : null}
       {isCustom ? (
         <label className="field">
-          <span>답변</span>
+          <span>{t("answerComposer.answerLabel")}</span>
           <textarea
-            aria-label="답변"
+            aria-label={t("answerComposer.answerLabel")}
             rows={5}
             maxLength={8000}
             value={answer}
             disabled={busy}
             onChange={(event) => onAnswerChange(event.target.value)}
-            placeholder="확인 가능한 사실과 아직 모르는 내용을 구분해 입력하세요."
+            placeholder={t("answerComposer.answerPlaceholder")}
           />
         </label>
       ) : null}
       <div className="composer-actions">
-        <span>{isCustom ? `${answer.length}/8000 · 입력 중에는 모델을 호출하지 않습니다.` : "선택 후 전송을 눌러야 답변이 전송됩니다."}</span>
+        <span>{isCustom ? t("answerComposer.customHint", { count: answer.length }) : t("answerComposer.optionHint")}</span>
         <button
           className="button-primary"
           type="button"
@@ -120,11 +122,11 @@ export function AnswerComposer({
             }
           }}
         >
-          답변 보내기
+          {t("answerComposer.sendAnswer")}
         </button>
         {retryAvailable ? (
           <button className="button-secondary" type="button" disabled={busy} onClick={onRetry}>
-            저장된 요청 다시 시도
+            {t("answerComposer.retry")}
           </button>
         ) : null}
       </div>

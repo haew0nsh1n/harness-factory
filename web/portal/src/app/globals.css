@@ -197,6 +197,29 @@ button {
   overflow-wrap: anywhere;
 }
 
+.locale-switcher {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+}
+
+.locale-switcher-label {
+  color: var(--hf-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.locale-switcher-select {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--hf-border);
+  border-radius: 0.4rem;
+  background: var(--hf-canvas);
+  color: var(--hf-ink);
+  font-size: 0.8rem;
+}
+
 .main-content {
   width: 100%;
   max-width: 1500px;

@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "id": "code-review",
+  "name": "Evidence-based code review",
+  "customer_id": "fictional-code-review",
+  "goal": "Compare implementation intent with test evidence and deliver important correctness issues as a read-only report.",
+  "trigger": "An owner provides the implementation to review together with its test-results.",
+  "inputs": ["implementation", "test-results"],
+  "outputs": ["review-report"],
+  "customer_rules": [
+    "Review the change intent, the actual code paths, and the test evidence together.",
+    "Distinguish uncertain possibilities from confirmed defects.",
+    "Do not auto-fix code or publish to external systems during review.",
+    "Do not claim success for tests that were not run or environments that were not verified."
+  ],
+  "approved": {"by": "fictional-fixture-author-not-customer-approval", "at": "2026-09-16T00:00:00+09:00"},
+  "steps": [
+    {
+      "id": "review",
+      "name": "Review intent and correctness",
+      "skill": "hf-review",
+      "needs": [],
+      "inputs": ["implementation", "test-results"],
+      "outputs": ["review-report"],
+      "tools": [],
+      "effect": "read",
+      "approval": false,
+      "approver": "",
+      "completion": "The review-report records requirement coverage, specific findings, provided test evidence, and unverified items distinctly.",
+      "failure": "If a required artifact is missing or unreadable, stop as blocked and do not claim the review is complete.",
+      "manual": null
+    }
+  ],
+  "traceability": [
+    {"requirement": "Review implementation intent and behavioral correctness together.", "steps": ["review"], "checks": ["Findings link to specific code locations and impact.", "Report in order of importance."]},
+    {"requirement": "Preserve the limits of the test evidence.", "steps": ["review"], "checks": ["Do not add successes absent from test-results.", "State missing or failed verifications explicitly."]}
+  ]
+}

@@ -20,6 +20,7 @@ function designFixture(status: HarnessDesign["status"] = "built"): HarnessDesign
     organization_id: "org-acme",
     customer_id: "cust-1",
     name: "Issue delivery",
+    language: "ko",
     profile: {},
     workflow: {
       id: "issue-to-reviewed-pr",
@@ -62,6 +63,7 @@ function existingAsset(
     type: "workflow",
     slug: "issue-to-reviewed-pr",
     name: "Issue delivery",
+    language: "ko",
     description:
       "Reduce acceptance rework without automating publication authority.",
     versions,
@@ -121,6 +123,7 @@ describe("RegistryPublishPanel", () => {
           type: "workflow",
           slug: "issue-to-reviewed-pr",
           name: "Issue delivery",
+          language: "ko",
           description:
             "Reduce acceptance rework without automating publication authority.",
           owner_subject_id: "consultant-42",

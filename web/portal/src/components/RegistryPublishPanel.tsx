@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { StatusBadge } from "@/components/StatusBadge";
+import { type TranslateFn } from "@/i18n/dictionaries";
+import { useTranslations } from "@/i18n/I18nProvider";
 import { api, apiRaw, ApiError } from "@/lib/api";
 import type {
   HarnessDesign,
@@ -45,22 +47,22 @@ function defaultDescription(design: HarnessDesign): string {
   return workflowText(design, "goal") || design.name;
 }
 
-function safeError(cause: unknown, fallback: string): string {
+function safeError(cause: unknown, fallback: string, t: TranslateFn): string {
   if (cause instanceof ApiError) {
     if (cause.status === 403) {
-      return "이 작업에 필요한 역할이 없습니다. 조직 관리자에게 역할을 확인해 주세요.";
+      return t("publish.role403");
     }
     if (cause.code === "stale_digest") {
-      return "설계 또는 버전 다이제스트가 변경되었습니다. 설계 상태를 새로고침한 뒤 다시 시도하세요.";
+      return t("publish.staleDigest");
     }
     if (
       cause.code === "artifact_unavailable" ||
       cause.code === "artifact_corrupted"
     ) {
-      return "검증된 빌드 산출물을 확인할 수 없습니다. 빌드를 다시 실행한 뒤 시도하세요.";
+      return t("publish.artifactUnavailable");
     }
     if (cause.code === "invalid_lifecycle") {
-      return "현재 상태에서는 이 작업을 수행할 수 없습니다. 설계 빌드와 레지스트리 단계를 확인하세요.";
+      return t("publish.invalidLifecycle");
     }
   }
   return fallback;
@@ -81,6 +83,7 @@ function asVersionDetail(
 }
 
 export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
+  const t = useTranslations();
   const defaults = useMemo(
     () => ({
       slug: safeSlug(design),
@@ -135,9 +138,7 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
         }
       } catch {
         if (active) {
-          setError(
-            "레지스트리 연결 정보를 불러오지 못했습니다. 잠시 후 다시 시도하거나 권한을 확인해 주세요.",
-          );
+          setError(t("publish.connectionError"));
         }
       }
     }
@@ -146,6 +147,7 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaults, design.digest, design.id, design.status]);
 
   if (design.status !== "built") {
@@ -177,19 +179,17 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
       exact.name !== name ||
       (exact.description ?? "") !== description
     ) {
-      setError(
-        "같은 슬러그의 기존 자산 이름 또는 설명이 입력값과 다릅니다. 기존 자산 정보를 확인하고 입력값을 맞추거나 다른 슬러그를 사용하세요.",
-      );
+      setError(t("publish.nameMismatch"));
       return false;
     }
     setAsset(exact);
-    setMessage("기존 자산을 사용합니다.");
+    setMessage(t("publish.useExisting"));
     return true;
   }
 
   async function prepareAsset(): Promise<void> {
     if (!actor || !slugValid || !name.trim() || !description.trim()) {
-      setError("슬러그, 이름, 설명을 올바르게 입력해 주세요.");
+      setError(t("publish.invalidInput"));
       return;
     }
     setBusy(true);
@@ -206,12 +206,13 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
             type: "workflow",
             slug,
             name: name.trim(),
+            language: design.language,
             description: description.trim(),
             owner_subject_id: actor.subject_id,
           },
         });
         setAsset({ ...created, versions: [] });
-        setMessage("자산 준비 완료");
+        setMessage(t("publish.assetReady"));
       } catch (cause) {
         if (!(cause instanceof ApiError) || cause.status !== 409) {
           throw cause;
@@ -223,14 +224,12 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
         const conflicted = refreshed.find((candidate) => candidate.slug === slug);
         if (!conflicted || !selectExisting(conflicted)) {
           if (!conflicted) {
-            setError(
-              "자산 생성 충돌이 발생했지만 같은 슬러그를 다시 찾지 못했습니다. 목록을 새로고침한 뒤 다시 시도하세요.",
-            );
+            setError(t("publish.conflictNotFound"));
           }
         }
       }
     } catch (cause) {
-      setError(safeError(cause, "레지스트리 자산을 준비하지 못했습니다. 권한과 입력값을 확인해 주세요."));
+      setError(safeError(cause, t("publish.prepareFailed"), t));
     } finally {
       setBusy(false);
     }
@@ -255,9 +254,7 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
           candidate.slug === selectedAsset.slug,
       );
       if (!refreshedAsset) {
-        setError(
-          "버전 생성 충돌이 발생했지만 새로고침한 목록에서 같은 자산을 찾지 못했습니다. 자산 목록을 확인한 뒤 다시 시도하세요.",
-        );
+        setError(t("publish.assetNotFoundAfterConflict"));
         return false;
       }
       setAsset(refreshedAsset);
@@ -265,9 +262,7 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
         refreshedAsset.name !== selectedName ||
         (refreshedAsset.description ?? "") !== selectedDescription
       ) {
-        setError(
-          "버전 생성 충돌 후 다시 불러온 자산의 이름 또는 설명이 입력값과 다릅니다. 기존 자산 정보를 확인하거나 다른 슬러그를 사용하세요.",
-        );
+        setError(t("publish.assetMismatchAfterConflict"));
         return false;
       }
       const refreshedVersion = refreshedAsset.versions.find(
@@ -275,7 +270,7 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
       );
       if (!refreshedVersion) {
         setError(
-          `버전 생성 충돌이 발생했지만 새로고침한 자산에서 ${selectedVersionNumber} 버전을 찾지 못했습니다. 목록을 다시 확인한 뒤 재시도하세요.`,
+          t("publish.versionNotFoundAfterConflict", { version: selectedVersionNumber }),
         );
         return false;
       }
@@ -287,7 +282,7 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
         manifest.artifact?.sha256 !== refreshedVersion.artifact_sha256
       ) {
         setError(
-          `같은 ${selectedVersionNumber} 버전이 있지만 현재 설계와 일치하지 않습니다. 설계 또는 산출물 다이제스트를 확인하고 새 버전 번호를 입력하거나 기존 버전을 검토하세요.`,
+          t("publish.versionMismatch", { version: selectedVersionNumber }),
         );
         return false;
       }
@@ -300,20 +295,18 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
         ),
       );
       setMessage(
-        `기존 ${selectedVersionNumber} 버전이 현재 설계와 일치해 다시 불러왔습니다.`,
+        t("publish.versionRecovered", { version: selectedVersionNumber }),
       );
       return true;
     } catch {
-      setError(
-        "버전 생성 충돌 후 기존 버전을 다시 확인하지 못했습니다. 자산 목록과 매니페스트를 확인한 뒤 재시도하세요.",
-      );
+      setError(t("publish.recoverFailed"));
       return false;
     }
   }
 
   async function createVersion(): Promise<void> {
     if (!asset || !versionValid || design.status !== "built") {
-      setError("빌드된 설계와 올바른 SemVer 버전이 필요합니다.");
+      setError(t("publish.needBuiltVersion"));
       return;
     }
     const selectedAsset = asset;
@@ -337,7 +330,7 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
         },
       );
       setVersion(created);
-      setMessage("버전 생성 완료");
+      setMessage(t("publish.versionCreated"));
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 409) {
         await recoverConflictingVersion(
@@ -349,7 +342,7 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
           organizationId,
         );
       } else {
-        setError(safeError(cause, "버전을 생성하지 못했습니다. 설계 빌드 상태와 버전 번호를 확인해 주세요."));
+        setError(safeError(cause, t("publish.createVersionFailed"), t));
       }
     } finally {
       setBusy(false);
@@ -374,9 +367,9 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
         },
       );
       setVersion(reviewed);
-      setMessage("레지스트리 버전 승인 완료");
+      setMessage(t("publish.versionApproved"));
     } catch (cause) {
-      setError(safeError(cause, "레지스트리 버전을 승인하지 못했습니다. 리뷰어 역할과 버전 상태를 확인해 주세요."));
+      setError(safeError(cause, t("publish.reviewFailed"), t));
     } finally {
       setBusy(false);
     }
@@ -400,9 +393,13 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
         },
       );
       setVersion(published);
-      setMessage(`${channel === "pilot" ? "파일럿" : "안정"} 채널 게시 완료`);
+      setMessage(
+        t("publish.publishedChannel", {
+          channel: t(channel === "pilot" ? "registry.channelPilot" : "registry.channelStable"),
+        }),
+      );
     } catch (cause) {
-      setError(safeError(cause, "버전을 게시하지 못했습니다. 관리자 역할과 버전 상태를 확인해 주세요."));
+      setError(safeError(cause, t("publish.publishFailed"), t));
     } finally {
       setBusy(false);
     }
@@ -411,42 +408,37 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
   return (
     <section className={`workspace-panel ${styles.panel}`}>
       <div>
-        <p className="eyebrow">Registry workflow</p>
-        <h2>레지스트리 등록</h2>
-        <p className={`muted ${styles.intro}`}>
-          설계 다이제스트 승인과 레지스트리 버전 승인은 서로 다른 절차입니다.
-          아래 단계에서 자산, 버전, 리뷰, 게시를 각각 확인하세요.
-        </p>
+        <p className="eyebrow">{t("publish.eyebrow")}</p>
+        <h2>{t("publish.heading")}</h2>
+        <p className={`muted ${styles.intro}`}>{t("publish.intro")}</p>
       </div>
 
       <div className={styles.fields}>
         <label className="field">
-          <span>레지스트리 슬러그</span>
+          <span>{t("publish.slugLabel")}</span>
           <input
-            aria-label="레지스트리 슬러그"
+            aria-label={t("publish.slugLabel")}
             value={slug}
             disabled={Boolean(asset) || busy}
             onChange={(event) => setSlug(event.target.value)}
           />
           {!slugValid ? (
-            <span className="field-error">
-              소문자, 숫자, 하이픈만 사용하고 직접 수정해 주세요.
-            </span>
+            <span className="field-error">{t("publish.slugError")}</span>
           ) : null}
         </label>
         <label className="field">
-          <span>이름</span>
+          <span>{t("publish.nameLabel")}</span>
           <input
-            aria-label="레지스트리 이름"
+            aria-label={t("publish.nameAria")}
             value={name}
             disabled={Boolean(asset) || busy}
             onChange={(event) => setName(event.target.value)}
           />
         </label>
         <label className={`field ${styles.wide}`}>
-          <span>설명</span>
+          <span>{t("publish.descLabel")}</span>
           <textarea
-            aria-label="레지스트리 설명"
+            aria-label={t("publish.descAria")}
             value={description}
             disabled={Boolean(asset) || busy}
             rows={2}
@@ -454,21 +446,21 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
           />
         </label>
         <label className="field">
-          <span>버전</span>
+          <span>{t("publish.versionLabel")}</span>
           <input
-            aria-label="버전"
+            aria-label={t("publish.versionLabel")}
             value={versionNumber}
             disabled={Boolean(version) || busy}
             onChange={(event) => setVersionNumber(event.target.value)}
           />
           {!versionValid ? (
-            <span className="field-error">MAJOR.MINOR.PATCH 형식이 필요합니다.</span>
+            <span className="field-error">{t("publish.versionError")}</span>
           ) : null}
         </label>
         <label className="field">
-          <span>배포 채널</span>
+          <span>{t("registry.channelLabel")}</span>
           <select
-            aria-label="배포 채널"
+            aria-label={t("registry.channelLabel")}
             value={channel}
             disabled={version?.status === "published" || busy}
             onChange={(event) =>
@@ -484,13 +476,11 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
       <ol className={styles.steps}>
         <li className={styles.step}>
           <div className={styles.stepHeader}>
-            <h3>1. 자산 준비</h3>
+            <h3>1. {t("publish.step1Title")}</h3>
             {asset ? <StatusBadge label="ready" /> : null}
           </div>
-          <p className="muted">
-            정확히 같은 슬러그를 재사용하거나 새 워크플로 자산을 만듭니다.
-          </p>
-          {!ready && !error ? <p className="muted">레지스트리 정보를 확인하는 중입니다.</p> : null}
+          <p className="muted">{t("publish.step1Desc")}</p>
+          {!ready && !error ? <p className="muted">{t("publish.checkingRegistry")}</p> : null}
           {ready ? (
             <div className="actions-row">
               <button
@@ -506,7 +496,7 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
                 }
                 onClick={() => void prepareAsset()}
               >
-                자산 준비
+                {t("publish.prepareAssetBtn")}
               </button>
               {asset ? (
                 <button
@@ -515,7 +505,7 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
                   disabled={busy}
                   onClick={reset}
                 >
-                  등록 흐름 초기화
+                  {t("publish.resetFlow")}
                 </button>
               ) : null}
             </div>
@@ -524,69 +514,63 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
 
         <li className={styles.step}>
           <div className={styles.stepHeader}>
-            <h3>2. 버전 생성</h3>
+            <h3>2. {t("publish.step2Title")}</h3>
             {version ? <StatusBadge label={version.status} /> : null}
           </div>
-          <p className="muted">
-            현재 설계 ID와 다이제스트를 검증된 빌드 산출물에 연결합니다.
-          </p>
+          <p className="muted">{t("publish.step2Desc")}</p>
           <button
             className="button-secondary"
             type="button"
             disabled={busy || !asset || Boolean(version) || !versionValid || !canAuthor}
             onClick={() => void createVersion()}
           >
-            버전 생성
+            {t("publish.createVersionBtn")}
           </button>
           {version ? (
             <dl className={styles.details}>
-              <div><dt>버전 다이제스트</dt><dd><code>{version.digest}</code></dd></div>
-              <div><dt>상태</dt><dd>{version.status}</dd></div>
-              <div><dt>산출물 SHA-256</dt><dd><code>{version.artifact_sha256}</code></dd></div>
+              <div><dt>{t("publish.versionDigest")}</dt><dd><code>{version.digest}</code></dd></div>
+              <div><dt>{t("publish.statusLabel")}</dt><dd>{version.status}</dd></div>
+              <div><dt>{t("publish.artifactSha")}</dt><dd><code>{version.artifact_sha256}</code></dd></div>
             </dl>
           ) : null}
         </li>
 
         <li className={styles.step}>
           <div className={styles.stepHeader}>
-            <h3>3. 레지스트리 버전 리뷰</h3>
+            <h3>3. {t("publish.step3Title")}</h3>
           </div>
-          <p className="muted">
-            설계 승인과 별개로 초안 레지스트리 버전을 리뷰어가 명시적으로 승인합니다.
-          </p>
+          <p className="muted">{t("publish.step3Desc")}</p>
           <button
             className="button-secondary"
             type="button"
             disabled={busy || version?.status !== "draft" || !canReview}
             onClick={() => void reviewVersion()}
           >
-            레지스트리 버전 승인
+            {t("publish.approveVersionBtn")}
           </button>
         </li>
 
         <li className={styles.step}>
           <div className={styles.stepHeader}>
-            <h3>4. 채널 게시</h3>
+            <h3>4. {t("publish.step4Title")}</h3>
           </div>
-          <p className="muted">승인된 버전을 선택한 채널에 명시적으로 게시합니다.</p>
+          <p className="muted">{t("publish.step4Desc")}</p>
           <button
             className="button-primary"
             type="button"
             disabled={busy || version?.status !== "approved" || !canManageAssets}
             onClick={() => void publishVersion()}
           >
-            게시
+            {t("publish.publishBtn")}
           </button>
           {version?.status === "published" ? (
-            <a href={`/registry/${slug}`}>레지스트리에서 보기</a>
+            <a href={`/registry/${slug}`}>{t("publish.viewInRegistry")}</a>
           ) : null}
         </li>
       </ol>
 
       {actor && (!canManageAssets || !canAuthor || !canReview) ? (
-        <p className="muted">
-          일부 단계에 필요한 author, reviewer 또는 registry-admin 역할이 없습니다.
-        </p>
+        <p className="muted">{t("publish.missingRoles")}</p>
       ) : null}
       {message ? <p className="save-state" role="status">{message}</p> : null}
       {error ? <p className="error-text" role="alert">{error}</p> : null}

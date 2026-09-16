@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "customer_id": "fictional-test-first-implementation",
+  "name": "Fictional customer - test-first implementation sample",
+  "sdlc": [
+    {"stage": "implementation", "current": "Tests are added after implementation, making it hard to isolate the cause of failures.", "desired": "Implement the approved plan in small red-green-refactor cycles and record the observed results."}
+  ],
+  "glossary": {
+    "plan": "An execution plan with approved target changes and verification method",
+    "test-results": "Evidence recording the commands actually run and their failure and success results"
+  },
+  "systems": [
+    {"id": "issue-store", "kind": "git-markdown-issue-tracker", "tool": "git", "capabilities": ["issue-read"]}
+  ],
+  "issue_tracker": {
+    "system_id": "issue-store",
+    "provider": "markdown",
+    "connection": "local",
+    "project": "fictional-project",
+    "path": "issues",
+    "skill": null,
+    "mcp": null,
+    "capabilities": ["issue-read"]
+  },
+  "roles": ["consultant", "engineer", "test-owner"],
+  "pains": [
+    {"description": "Implementation is reported complete without test evidence.", "impact": "Regression risk and re-verification time increase.", "frequency": "Fictional example; the real frequency is not verified."}
+  ],
+  "success_criteria": [
+    "Observe the failure first, make the minimal change, then observe the success again.",
+    "Do not record tests that were not run as passing."
+  ],
+  "constraints": [
+    "This is fictional customer information; the real repository and test commands are not verified.",
+    "Do not perform refactoring or external publishing beyond the approved plan."
+  ],
+  "facts": [
+    {"id": "fictional-source", "statement": "The sample content is fictional material used to illustrate product behavior.", "evidence": "Development fixture included in the repository"}
+  ],
+  "assumptions": ["At run time an approved plan and local test tools are provided."],
+  "unknowns": ["The real test framework, commands, and regression scope are not verified."]
+}

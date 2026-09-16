@@ -791,6 +791,7 @@ def test_developer_search_uses_one_query_and_keeps_highest_semantic_version(
                 "type": "workflow",
                 "slug": "issue-to-pilot",
                 "name": "Pilot",
+                "language": "ko",
                 "description": "Publishes a workflow package",
                 "versions": [
                     {
@@ -808,6 +809,7 @@ def test_developer_search_uses_one_query_and_keeps_highest_semantic_version(
                 "type": "workflow",
                 "slug": "issue-to-pr",
                 "name": "Stable",
+                "language": "ko",
                 "description": "Publishes a workflow package",
                 "versions": [
                     {
@@ -848,6 +850,7 @@ def test_developer_search_uses_one_query_and_keeps_highest_semantic_version(
                 "type": "workflow",
                 "slug": "issue-to-pr",
                 "name": "Stable",
+                "language": "ko",
                 "description": "Publishes a workflow package",
                 "versions": [
                     {
@@ -877,6 +880,7 @@ def test_developer_search_uses_one_query_and_keeps_highest_semantic_version(
             "type": "workflow",
             "slug": "issue-to-pr",
             "name": "Stable",
+            "language": "ko",
             "description": "Publishes a workflow package",
             "owner_subject_id": "owner-1",
             "visibility": "internal",
@@ -1018,6 +1022,7 @@ def test_privileged_search_uses_one_query_and_preserves_unpublished_visibility(
                 "type": "workflow",
                 "slug": "issue-to-draft",
                 "name": "Draft",
+                "language": "ko",
                 "description": "Publishes a workflow package",
                 "versions": [],
             },
@@ -1026,6 +1031,7 @@ def test_privileged_search_uses_one_query_and_preserves_unpublished_visibility(
                 "type": "workflow",
                 "slug": "issue-to-pilot",
                 "name": "Pilot",
+                "language": "ko",
                 "description": "Publishes a workflow package",
                 "versions": [],
             },
@@ -1034,6 +1040,7 @@ def test_privileged_search_uses_one_query_and_preserves_unpublished_visibility(
                 "type": "workflow",
                 "slug": "issue-to-pr",
                 "name": "Stable",
+                "language": "ko",
                 "description": "Publishes a workflow package",
                 "versions": [
                     {
@@ -1051,6 +1058,7 @@ def test_privileged_search_uses_one_query_and_preserves_unpublished_visibility(
                 "type": "workflow",
                 "slug": "issue-to-revoke",
                 "name": "Revoked",
+                "language": "ko",
                 "description": "Publishes a workflow package",
                 "versions": [
                     {

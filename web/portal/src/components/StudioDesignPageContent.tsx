@@ -14,6 +14,8 @@ import {
   StructuredDesignEditors,
   type DesignDocuments,
 } from "@/components/studio/StructuredDesignEditors";
+import { type TranslateFn } from "@/i18n/dictionaries";
+import { useTranslations } from "@/i18n/I18nProvider";
 import { api, ApiError } from "@/lib/api";
 import {
   isJsonDocument,
@@ -127,9 +129,9 @@ function findingsFromErrorPayload(payload: unknown): ValidationFinding[] | null 
   return null;
 }
 
-function operationError(cause: unknown, fallback: string): string {
+function operationError(cause: unknown, fallback: string, t: TranslateFn): string {
   if (cause instanceof ApiError && cause.status === 409) {
-    return `최신 리비전과 충돌했습니다. 페이지를 새로고침한 뒤 다시 시도하세요. ${cause.message}`;
+    return t("studioDesign.conflictError", { message: cause.message });
   }
   return cause instanceof Error ? cause.message : fallback;
 }
@@ -160,14 +162,14 @@ function parseDraftDocuments(documents: DraftDocuments): {
   };
 }
 
-function fieldLabel(field: DraftDocumentField): string {
-  const labels: Record<DraftDocumentField, string> = {
-    profile: "프로필 JSON",
-    workflow: "워크플로 JSON",
-    scenarios: "시나리오 JSON",
-    catalog: "카탈로그 JSON",
+function fieldLabelKey(field: DraftDocumentField): string {
+  const keys: Record<DraftDocumentField, string> = {
+    profile: "studioDesign.profileLabel",
+    workflow: "studioDesign.workflowLabel",
+    scenarios: "studioDesign.scenariosLabel",
+    catalog: "studioDesign.catalogLabel",
   };
-  return labels[field];
+  return keys[field];
 }
 
 function evidenceFromProfile(profile: Record<string, unknown>): EvidenceItem[] {
@@ -214,7 +216,10 @@ function evidenceFromProfile(profile: Record<string, unknown>): EvidenceItem[] {
   return evidence;
 }
 
-function validateDraftDocuments(documents: DraftDocuments): {
+function validateDraftDocuments(
+  documents: DraftDocuments,
+  t: TranslateFn,
+): {
   parsed: ReturnType<typeof parseDraftDocuments> | null;
   errors: DraftDocumentErrors;
 } {
@@ -225,8 +230,11 @@ function validateDraftDocuments(documents: DraftDocuments): {
     try {
       parsed[field] = JSON.parse(documents[field]) as Record<string, unknown>;
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "알 수 없는 구문 오류";
-      errors[field] = `${fieldLabel(field)}이 올바르지 않습니다: ${message}`;
+      const message = cause instanceof Error ? cause.message : t("studioDesign.unknownSyntaxError");
+      errors[field] = t("studioDesign.invalidDocument", {
+        label: t(fieldLabelKey(field)),
+        message,
+      });
     }
   }
 
@@ -239,6 +247,7 @@ function validateDraftDocuments(documents: DraftDocuments): {
 export function StudioDesignPageContent({
   designId,
 }: StudioDesignPageContentProps) {
+  const t = useTranslations();
   const [design, setDesign] = useState<HarnessDesign | null>(null);
   const [documents, setDocuments] = useState<DraftDocuments | null>(null);
   const [build, setBuild] = useState<BuildJob | null>(null);
@@ -269,7 +278,7 @@ export function StudioDesignPageContent({
           setDocumentErrors({});
           setErrorFindings(null);
           setError(null);
-          setStatusMessage("저장된 설계입니다.");
+          setStatusMessage(t("studioDesign.savedDesign"));
         }
         if (process.env.NODE_ENV !== "test") {
           try {
@@ -284,7 +293,7 @@ export function StudioDesignPageContent({
         }
       } catch (cause) {
         if (active) {
-          setError(cause instanceof ApiError ? cause.message : "설계를 불러오지 못했습니다.");
+          setError(cause instanceof ApiError ? cause.message : t("studioDesign.loadError"));
         }
       }
     }
@@ -294,6 +303,7 @@ export function StudioDesignPageContent({
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [designId]);
 
   const dirty = useMemo(() => {
@@ -363,13 +373,14 @@ export function StudioDesignPageContent({
         ? validateDesignFormDocuments(
             structuredDocuments,
             authoritativeCatalog ?? structuredDocuments.catalog,
+            t,
           )
         : {},
-    [authoritativeCatalog, structuredDocuments],
+    [authoritativeCatalog, structuredDocuments, t],
   );
   const liveDocumentErrors = useMemo(
-    () => documents ? validateDraftDocuments(documents).errors : {},
-    [documents],
+    () => documents ? validateDraftDocuments(documents, t).errors : {},
+    [documents, t],
   );
   const visibleDocumentErrors = {
     ...documentErrors,
@@ -386,7 +397,7 @@ export function StudioDesignPageContent({
 
   function updateDocument(field: keyof DraftDocuments, value: string): void {
     setDocuments((current) => (current ? { ...current, [field]: value } : current));
-    setStatusMessage("저장하지 않은 변경 사항이 있습니다.");
+    setStatusMessage(t("studioDesign.unsavedChanges"));
     setDocumentErrors((current) => {
       if (!(field in current)) {
         return current;
@@ -404,7 +415,7 @@ export function StudioDesignPageContent({
 
     setSaving(true);
     try {
-      const validation = validateDraftDocuments(documents);
+      const validation = validateDraftDocuments(documents, t);
       if (!validation.parsed) {
         setDocumentErrors(validation.errors);
         setError(null);
@@ -414,7 +425,7 @@ export function StudioDesignPageContent({
         Object.keys(structuredErrors).length > 0 ||
         Object.keys(transientFormState.errors).length > 0
       ) {
-        setError("양식 오류를 수정한 뒤 저장하세요.");
+        setError(t("studioDesign.fixFormErrors"));
         return;
       }
       const updated = await api<HarnessDesign>(`/designs/${design.id}`, {
@@ -431,13 +442,13 @@ export function StudioDesignPageContent({
       setDocumentErrors({});
       setErrorFindings(null);
       setError(null);
-      setStatusMessage("초안을 저장했습니다.");
+      setStatusMessage(t("studioDesign.draftSaved"));
       setStaleConflict(false);
     } catch (cause) {
       setErrorFindings(
         cause instanceof ApiError ? findingsFromErrorPayload(cause.payload) : null,
       );
-      setError(operationError(cause, "초안을 저장하지 못했습니다."));
+      setError(operationError(cause, t("studioDesign.draftSaveFailed"), t));
       setStaleConflict(cause instanceof ApiError && cause.status === 409);
     } finally {
       setSaving(false);
@@ -451,9 +462,9 @@ export function StudioDesignPageContent({
       setDocuments(documentsFromDesign(loaded));
       setStaleConflict(false);
       setError(null);
-      setStatusMessage("서버의 최신 설계를 불러왔습니다.");
+      setStatusMessage(t("studioDesign.reloadedLatest"));
     } catch (cause) {
-      setError(operationError(cause, "최신 설계를 불러오지 못했습니다."));
+      setError(operationError(cause, t("studioDesign.reloadFailed"), t));
     }
   }
 
@@ -472,7 +483,7 @@ export function StudioDesignPageContent({
       setDocumentErrors({});
       setErrorFindings(null);
       setError(null);
-      setStatusMessage("설계 검증을 완료했습니다.");
+      setStatusMessage(t("studioDesign.validatedDesign"));
     } catch (cause) {
       const payload = cause instanceof ApiError ? cause.payload : null;
       const rejected = designFromErrorPayload(payload);
@@ -484,7 +495,7 @@ export function StudioDesignPageContent({
         setErrorFindings(findingsFromErrorPayload(payload));
       }
       setDocumentErrors({});
-      setError(operationError(cause, "설계를 검증하지 못했습니다."));
+      setError(operationError(cause, t("studioDesign.validateFailed"), t));
     } finally {
       setSaving(false);
     }
@@ -511,14 +522,14 @@ export function StudioDesignPageContent({
       setError(null);
       setStatusMessage(
         decision === "approved"
-          ? "현재 다이제스트를 승인했습니다."
-          : "현재 다이제스트를 반려했습니다.",
+          ? t("studioDesign.approvedDigest")
+          : t("studioDesign.rejectedDigest"),
       );
     } catch (cause) {
       setErrorFindings(
         cause instanceof ApiError ? findingsFromErrorPayload(cause.payload) : null,
       );
-      setError(operationError(cause, "검토 결과를 제출하지 못했습니다."));
+      setError(operationError(cause, t("studioDesign.reviewSubmitFailed"), t));
     } finally {
       setSaving(false);
     }
@@ -541,7 +552,7 @@ export function StudioDesignPageContent({
       setDesign((current) =>
         current ? { ...current, status: "build-queued" } : current,
       );
-      setStatusMessage("빌드를 요청했습니다.");
+      setStatusMessage(t("studioDesign.buildQueued"));
       setDocumentErrors({});
       setError(null);
       try {
@@ -550,10 +561,10 @@ export function StudioDesignPageContent({
         setDocuments(documentsFromDesign(refreshed));
         setStatusMessage(null);
       } catch {
-        setStatusMessage("빌드를 요청했지만 최신 설계 상태를 불러오지 못했습니다.");
+        setStatusMessage(t("studioDesign.buildQueuedNoRefresh"));
       }
     } catch (cause) {
-      setError(operationError(cause, "빌드를 요청하지 못했습니다."));
+      setError(operationError(cause, t("studioDesign.buildFailed"), t));
       setStatusMessage(null);
     } finally {
       setSaving(false);
@@ -567,7 +578,7 @@ export function StudioDesignPageContent({
   if (!design || !documents) {
     return (
       <section className="workspace-panel state-panel" aria-busy="true">
-        <p className="muted">설계를 불러오는 중입니다.</p>
+        <p className="muted">{t("studioDesign.loading")}</p>
       </section>
     );
   }
@@ -577,14 +588,18 @@ export function StudioDesignPageContent({
       <section className="workspace-panel design-hero">
         <div className="page-header">
           <div>
-            <p className="eyebrow">설계 작업공간 · 리비전 {design.revision}</p>
+            <p className="eyebrow">
+              {t("studioDesign.heroEyebrow", { revision: design.revision })}
+            </p>
             <h1 className="workspace-heading">{design.name}</h1>
-            <p className="page-description">고객 ID {design.customer_id}</p>
+            <p className="page-description">
+              {t("studioDesign.customerId", { customer: design.customer_id })}
+            </p>
           </div>
           <StatusBadge label={design.status} />
         </div>
         <div className="digest-row">
-          <span>현재 다이제스트</span>
+          <span>{t("studioDesign.currentDigest")}</span>
           <code className="digest-text">{design.digest}</code>
         </div>
         <div className="actions-row">
@@ -594,7 +609,7 @@ export function StudioDesignPageContent({
             onClick={() => void saveDraft()}
             disabled={saving}
           >
-            초안 저장
+            {t("studioDesign.saveDraftBtn")}
           </button>
           <button
             className="button-secondary"
@@ -602,7 +617,7 @@ export function StudioDesignPageContent({
             onClick={() => void validateDesign()}
             disabled={saving || !canValidate(design.status)}
           >
-            설계 검증
+            {t("studioDesign.validateBtn")}
           </button>
           <button
             className="button-secondary"
@@ -610,7 +625,7 @@ export function StudioDesignPageContent({
             onClick={() => void reviewDesign("approved")}
             disabled={saving || !canReview(design.status)}
           >
-            다이제스트 승인
+            {t("studioDesign.approveDigestBtn")}
           </button>
           <button
             className="button-secondary"
@@ -618,7 +633,7 @@ export function StudioDesignPageContent({
             onClick={() => void reviewDesign("rejected")}
             disabled={saving || !canReview(design.status)}
           >
-            검토 반려
+            {t("studioDesign.rejectReviewBtn")}
           </button>
           <button
             className="button-secondary"
@@ -626,7 +641,7 @@ export function StudioDesignPageContent({
             onClick={() => void queueBuild()}
             disabled={saving || !canBuild(design.status)}
           >
-            빌드 요청
+            {t("studioDesign.requestBuildBtn")}
           </button>
         </div>
         {error ? <p className="error-text">{error}</p> : null}
@@ -637,12 +652,9 @@ export function StudioDesignPageContent({
               type="button"
               onClick={() => void reloadDesign()}
             >
-              서버 최신본 불러오기
+              {t("studioDesign.loadServerLatest")}
             </button>
-            <p className="muted">
-              현재 로컬 편집은 그대로 유지되어 있습니다. 최신본을 불러오면 로컬
-              편집을 교체합니다.
-            </p>
+            <p className="muted">{t("studioDesign.conflictNote")}</p>
           </div>
         ) : null}
         {statusMessage ? (
@@ -653,33 +665,27 @@ export function StudioDesignPageContent({
       </section>
 
       <InterviewWorkspace
-        title={`${design.name} 근거`}
+        title={t("studioDesign.evidenceTitle", { name: design.name })}
         stage="unavailable"
         evidence={profileEvidence}
         conversation={
           <div className="unavailable-state">
-            <p className="eyebrow">인터뷰 상태</p>
-            <h3>대화형 인터뷰는 아직 제공되지 않습니다.</h3>
-            <p>
-              이 화면은 저장된 설계의 실제 프로필 근거만 보여 줍니다. 질문 생성과
-              답변 저장은 3단계에서 서버 인터뷰 모델과 함께 연결됩니다.
-            </p>
+            <p className="eyebrow">{t("studioDesign.interviewStatusEyebrow")}</p>
+            <h3>{t("studioDesign.interviewUnavailableTitle")}</h3>
+            <p>{t("studioDesign.interviewUnavailableBody")}</p>
           </div>
         }
         composer={
           <div className="composer-boundary" aria-disabled="true">
-            <strong>답변 입력 미제공</strong>
-            <span>현재 설계는 아래 JSON 편집기에서 계속 검토하고 저장할 수 있습니다.</span>
+            <strong>{t("studioDesign.composerDisabledTitle")}</strong>
+            <span>{t("studioDesign.composerDisabledBody")}</span>
           </div>
         }
       />
 
       {!structuredDocuments ? (
         <section className="workspace-panel" role="alert">
-          <p className="error-text">
-            구조화된 양식을 갱신할 수 없는 JSON 형식입니다. 디버그 JSON을 열어
-            오류를 수정하세요. 기존 양식 상태와 원본 값은 유지되며 저장되지 않습니다.
-          </p>
+          <p className="error-text">{t("studioDesign.structuredError")}</p>
         </section>
       ) : null}
       {displayedStructuredDocuments ? (
@@ -697,7 +703,7 @@ export function StudioDesignPageContent({
                 scenarios: prettyJson(next.scenarios),
                 catalog: documents.catalog,
               });
-              setStatusMessage("저장하지 않은 변경 사항이 있습니다.");
+              setStatusMessage(t("studioDesign.unsavedChanges"));
             }}
           />
         </div>
@@ -705,13 +711,13 @@ export function StudioDesignPageContent({
 
       <div className="detail-grid">
       <section className="workspace-panel">
-        <p className="eyebrow">빌드</p>
-        <h2>빌드 상태</h2>
+        <p className="eyebrow">{t("studioDesign.buildEyebrow")}</p>
+        <h2>{t("studioDesign.buildStatusHeading")}</h2>
         <p>
           {buildStatus ? (
             <StatusBadge label={buildStatus} />
           ) : (
-            "이 작업에서 요청한 빌드가 없습니다."
+            t("studioDesign.noBuild")
           )}
         </p>
         {build?.artifact_digest ? (
@@ -720,10 +726,10 @@ export function StudioDesignPageContent({
       </section>
 
       <section className="workspace-panel">
-        <p className="eyebrow">서버 검증</p>
-        <h2>검증 결과</h2>
+        <p className="eyebrow">{t("studioDesign.serverValidationEyebrow")}</p>
+        <h2>{t("studioDesign.validationResults")}</h2>
         {rawFindings.length === 0 ? (
-          <p className="muted">검증 결과가 없습니다.</p>
+          <p className="muted">{t("studioDesign.noFindings")}</p>
         ) : (
           <div className="finding-list">
             {rawFindings.map((finding) => (
@@ -739,14 +745,14 @@ export function StudioDesignPageContent({
       <RegistryPublishPanel design={design} />
 
       <DebugJsonDisclosure
-        label="고급 / 디버그 JSON"
-        hint="원문을 직접 확인하거나 구조화된 양식으로 복구할 때 사용합니다."
+        label={t("studioDesign.debugLabel")}
+        hint={t("studioDesign.debugHint")}
         errors={(Object.keys(visibleDocumentErrors) as DraftDocumentField[]).flatMap(
           (field) => visibleDocumentErrors[field] ? [visibleDocumentErrors[field]] : [],
         )}
         focusTargetLabel={
           (Object.keys(visibleDocumentErrors) as DraftDocumentField[])
-            .map((field) => visibleDocumentErrors[field] ? fieldLabel(field) : null)
+            .map((field) => visibleDocumentErrors[field] ? t(fieldLabelKey(field)) : null)
             .find((label): label is string => label !== null)
         }
       >

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "customer_id": "fictional-issue-planning",
+  "name": "Fictional customer - issue planning sample",
+  "sdlc": [
+    {"stage": "planning", "current": "Planning sometimes starts before the issue's requirements and constraints are confirmed.", "desired": "Clarify the issue through questions first, then turn only the approved scope into an execution plan."}
+  ],
+  "glossary": {
+    "brief": "A draft capturing the goal, scope, constraints, and acceptance criteria confirmed from the issue",
+    "plan": "An execution plan covering the implementation files, verification method, and stop conditions"
+  },
+  "systems": [
+    {"id": "issue-store", "kind": "git-markdown-issue-tracker", "tool": "git", "capabilities": ["issue-read"]}
+  ],
+  "issue_tracker": {
+    "system_id": "issue-store",
+    "provider": "markdown",
+    "connection": "local",
+    "project": "fictional-project",
+    "path": "issues",
+    "skill": null,
+    "mcp": null,
+    "capabilities": ["issue-read"]
+  },
+  "roles": ["consultant", "product-owner", "engineer"],
+  "pains": [
+    {"description": "Unclear issues cause rework during implementation.", "impact": "The plan and implementation scope keep changing.", "frequency": "Fictional example; the real frequency is not verified."}
+  ],
+  "success_criteria": [
+    "Do not finalize a plan from an unapproved brief.",
+    "Each plan item traces to a confirmed issue requirement."
+  ],
+  "constraints": [
+    "This is fictional customer information; real tool access and permissions are not verified.",
+    "This sample does not perform implementation, publishing, or deployment."
+  ],
+  "facts": [
+    {"id": "fictional-source", "statement": "The sample content is fictional material used to illustrate product behavior.", "evidence": "Development fixture included in the repository"}
+  ],
+  "assumptions": ["At run time the issue body is provided or approved local reads are available."],
+  "unknowns": ["The real customer's issue format, repository path, and approvers are not verified."]
+}

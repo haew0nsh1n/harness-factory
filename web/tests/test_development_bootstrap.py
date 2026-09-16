@@ -346,14 +346,20 @@ def test_bootstrap_cli_with_sample_designs_reports_seed_results(
     finally:
         get_settings.cache_clear()
 
-    assert len(payload["sample_designs"]) == 4
+    assert len(payload["sample_designs"]) == 8
     assert all(sample["created"] for sample in payload["sample_designs"])
+    assert {sample["language"] for sample in payload["sample_designs"]} == {"ko", "en"}
     assert [sample["template"] for sample in payload["sample_registry"]] == [
         "issue-planning",
         "test-first-implementation",
         "code-review",
         "manual-handoff",
+        "issue-planning",
+        "test-first-implementation",
+        "code-review",
+        "manual-handoff",
     ]
+    assert {sample["language"] for sample in payload["sample_registry"]} == {"ko", "en"}
     assert all(sample["created"] for sample in payload["sample_registry"])
 
 

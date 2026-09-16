@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from harness_factory import load_json, validate, validate_scenarios
+from web.api.designs.models import CONTENT_LANGUAGE_DEFAULT, CONTENT_LANGUAGES
 from web.api.designs.repository import (
     HarnessDesignRepository,
     SeedDesignIdentityCollision,
@@ -36,22 +37,32 @@ class SampleDesignSeedResult:
     created: bool
 
 
-def sample_design_id(organization_id: str, template_key: str) -> str:
-    return str(
-        uuid5(
-            SAMPLE_DESIGN_NAMESPACE,
-            f"{organization_id}:{template_key}",
-        )
-    )
+def sample_design_id(
+    organization_id: str, template_key: str, language: str = CONTENT_LANGUAGE_DEFAULT
+) -> str:
+    # Keep the default-language id formula unchanged so existing rows stay stable.
+    key = f"{organization_id}:{template_key}"
+    if language != CONTENT_LANGUAGE_DEFAULT:
+        key = f"{key}:{language}"
+    return str(uuid5(SAMPLE_DESIGN_NAMESPACE, key))
 
 
 def _repository_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
-def _load_request(template_key: str) -> HarnessDesignRequest:
+def _fixture_root(template_key: str, language: str) -> Path:
+    base = _repository_root() / "examples" / "sample-workflows" / template_key
+    if language == CONTENT_LANGUAGE_DEFAULT:
+        return base
+    return base / language
+
+
+def _load_request(
+    template_key: str, language: str = CONTENT_LANGUAGE_DEFAULT
+) -> HarnessDesignRequest:
     root = _repository_root()
-    fixture_root = root / "examples" / "sample-workflows" / template_key
+    fixture_root = _fixture_root(template_key, language)
     catalog_path = root / "catalog" / "catalog.json"
     profile = load_json(fixture_root / "profile.json")
     workflow = load_json(fixture_root / "workflow.json")
@@ -62,6 +73,7 @@ def _load_request(template_key: str) -> HarnessDesignRequest:
     return HarnessDesignRequest(
         customer_id=profile["customer_id"],
         name=workflow["name"],
+        language=language,
         profile=profile,
         workflow=workflow,
         scenarios=scenarios,
@@ -74,7 +86,10 @@ def seed_sample_designs(
     *,
     organization_id: str,
     actor_id: str,
+    language: str = CONTENT_LANGUAGE_DEFAULT,
 ) -> list[SampleDesignSeedResult]:
+    if language not in CONTENT_LANGUAGES:
+        raise SampleDesignSeedInvalid(f"unsupported sample language: {language}")
     ensure_sqlite_write_transaction(session)
     organization = session.scalar(
         select(Organization)
@@ -96,10 +111,10 @@ def seed_sample_designs(
     for template_key in SAMPLE_TEMPLATE_KEYS:
         try:
             design, created = repository.insert_seed_if_missing(
-                design_id=sample_design_id(organization_id, template_key),
+                design_id=sample_design_id(organization_id, template_key, language),
                 organization_id=organization_id,
                 actor_id=actor_id,
-                request=_load_request(template_key),
+                request=_load_request(template_key, language),
             )
         except SeedDesignIdentityCollision as exc:
             raise SampleDesignSeedInvalid(

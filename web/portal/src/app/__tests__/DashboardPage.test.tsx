@@ -26,10 +26,10 @@ describe("DashboardPageContent", () => {
             jsonResponse({
               ok: true,
               items: [
-                { id: "d-1", customer_id: "cust-1", name: "Draft", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 1, digest: "a".repeat(64), status: "draft", validation_findings: null, organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" },
-                { id: "d-2", customer_id: "cust-1", name: "Validated", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 2, digest: "b".repeat(64), status: "validated", validation_findings: [], organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" },
-                { id: "d-3", customer_id: "cust-1", name: "Approved", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 3, digest: "c".repeat(64), status: "approved", validation_findings: [], organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" },
-                { id: "d-4", customer_id: "cust-1", name: "Built", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 4, digest: "d".repeat(64), status: "built", validation_findings: [], organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" }
+                { id: "d-1", customer_id: "cust-1", name: "Draft", language: "ko", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 1, digest: "a".repeat(64), status: "draft", validation_findings: null, organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" },
+                { id: "d-2", customer_id: "cust-1", name: "Validated", language: "ko", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 2, digest: "b".repeat(64), status: "validated", validation_findings: [], organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" },
+                { id: "d-3", customer_id: "cust-1", name: "Approved", language: "ko", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 3, digest: "c".repeat(64), status: "approved", validation_findings: [], organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" },
+                { id: "d-4", customer_id: "cust-1", name: "Built", language: "ko", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 4, digest: "d".repeat(64), status: "built", validation_findings: [], organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" }
               ],
             }),
           );
@@ -44,6 +44,7 @@ describe("DashboardPageContent", () => {
                   type: "workflow",
                   slug: "alpha",
                   name: "Alpha",
+                  language: "ko",
                   description: "First",
                   versions: [
                     { id: "v-1", version: "1.0.0", digest: "e".repeat(64), status: "published", channel: "pilot", artifact_sha256: "1".repeat(64) },
@@ -55,6 +56,7 @@ describe("DashboardPageContent", () => {
                   type: "workflow",
                   slug: "beta",
                   name: "Beta",
+                  language: "ko",
                   description: "Second",
                   versions: [
                     { id: "v-3", version: "2.0.0", digest: "0".repeat(64), status: "published", channel: "stable", artifact_sha256: "3".repeat(64) }

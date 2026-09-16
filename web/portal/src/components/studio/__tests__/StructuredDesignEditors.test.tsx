@@ -47,7 +47,7 @@ describe("StructuredDesignEditors proposal review", () => {
     ).toContain('"customer_id": "example-team"');
     expect(
       (screen.getByRole("textbox", {
-        name: "워크플로 전체 JSON 검토",
+        name: "워크플로우 전체 JSON 검토",
       }) as HTMLTextAreaElement).value,
     ).toContain('"id": "issue-to-reviewed-pr"');
     expect(
@@ -118,7 +118,7 @@ describe("StructuredDesignEditors proposal review", () => {
         .getByText("선행 단계").parentElement,
     ).toHaveTextContent("선행 단계 · clarify");
     expect(
-      screen.getByRole("textbox", { name: "워크플로 전체 JSON 검토" }),
+      screen.getByRole("textbox", { name: "워크플로우 전체 JSON 검토" }),
     ).not.toBeVisible();
   });
 

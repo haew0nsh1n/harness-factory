@@ -23,10 +23,10 @@ describe("StudioPageContent", () => {
         jsonResponse({
           ok: true,
           items: [
-            { id: "design-draft", customer_id: "cust-1", name: "Draft Design", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 1, digest: "a".repeat(64), status: "draft", validation_findings: null, organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" },
-            { id: "design-validated", customer_id: "cust-2", name: "Validated Design", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 4, digest: "b".repeat(64), status: "validated", validation_findings: [], organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" },
-            { id: "design-approved", customer_id: "cust-3", name: "Approved Design", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 2, digest: "c".repeat(64), status: "approved", validation_findings: [], organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" },
-            { id: "design-built", customer_id: "cust-4", name: "Built Design", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 9, digest: "d".repeat(64), status: "built", validation_findings: [], organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" }
+            { id: "design-draft", customer_id: "cust-1", name: "Draft Design", language: "ko", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 1, digest: "a".repeat(64), status: "draft", validation_findings: null, organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" },
+            { id: "design-validated", customer_id: "cust-2", name: "Validated Design", language: "ko", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 4, digest: "b".repeat(64), status: "validated", validation_findings: [], organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" },
+            { id: "design-approved", customer_id: "cust-3", name: "Approved Design", language: "ko", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 2, digest: "c".repeat(64), status: "approved", validation_findings: [], organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" },
+            { id: "design-built", customer_id: "cust-4", name: "Built Design", language: "ko", profile: {}, workflow: {}, scenarios: {}, catalog: {}, revision: 9, digest: "d".repeat(64), status: "built", validation_findings: [], organization_id: "org-acme", created_by: "author-1", created_at: "2026-09-14T00:00:00Z", updated_at: "2026-09-14T00:00:00Z" }
           ],
         }),
       );

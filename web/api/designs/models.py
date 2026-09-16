@@ -44,6 +44,11 @@ APPROVAL_DECISIONS = frozenset(
     {APPROVAL_DECISION_APPROVED, APPROVAL_DECISION_REJECTED}
 )
 
+CONTENT_LANGUAGE_KO = "ko"
+CONTENT_LANGUAGE_EN = "en"
+CONTENT_LANGUAGE_DEFAULT = CONTENT_LANGUAGE_KO
+CONTENT_LANGUAGES = frozenset({CONTENT_LANGUAGE_KO, CONTENT_LANGUAGE_EN})
+
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
@@ -68,6 +73,13 @@ class HarnessDesign(Base):
     )
     customer_id: Mapped[str] = mapped_column(String(80), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    language: Mapped[str] = mapped_column(
+        String(8),
+        nullable=False,
+        default=CONTENT_LANGUAGE_DEFAULT,
+        server_default=CONTENT_LANGUAGE_DEFAULT,
+        index=True,
+    )
     profile_json: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
     workflow_json: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
     scenarios_json: Mapped[list[object]] = mapped_column(JSON, nullable=False)

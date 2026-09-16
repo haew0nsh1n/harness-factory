@@ -34,6 +34,8 @@ import {
   type ProposalOperationEnvelope,
   type StartOperationEnvelope,
 } from "@/components/studio/interviewOperations";
+import { type TranslateFn } from "@/i18n/dictionaries";
+import { useLocale, useTranslations } from "@/i18n/I18nProvider";
 import { api, ApiError } from "@/lib/api";
 import type {
   HarnessDesign,
@@ -93,60 +95,13 @@ function hasExpiredRunningOperation(session: InterviewSession | null): boolean {
   );
 }
 
-function safeError(cause: unknown): string {
+function describeApiError(cause: unknown, t: TranslateFn): string {
   if (!(cause instanceof ApiError)) {
-    return "요청을 완료하지 못했습니다. 네트워크 연결을 확인하고 다시 시도하세요.";
+    return t("interview.networkError");
   }
-  const messages: Record<string, string> = {
-    llm_not_configured:
-      "인터뷰 모델이 구성되지 않았습니다. 기존 설계 편집은 계속 사용할 수 있습니다.",
-    llm_auth_unavailable:
-      "Azure OpenAI 인증을 사용할 수 없습니다. 관리자에게 모델 ID 권한을 확인해 달라고 요청하세요.",
-    llm_throttled:
-      "Azure OpenAI가 현재 요청을 제한하고 있습니다. 잠시 후 같은 요청을 다시 시도하세요.",
-    llm_timeout:
-      "모델 응답이 시간 안에 완료되지 않았습니다. 저장된 동일 요청을 다시 시도할 수 있습니다.",
-    llm_refused:
-      "모델이 이 요청에 답하지 않았습니다. 비밀, 코드, 이슈 본문을 제거하고 새 요청으로 보내세요.",
-    llm_invalid_result:
-      "모델 응답이 인터뷰 형식 검사를 통과하지 못했습니다. 저장된 동일 요청을 다시 시도하세요.",
-    llm_context_limit:
-      "인터뷰 문맥 한도에 도달했습니다. 현재 근거로 제안을 검토하거나 인터뷰를 삭제하세요.",
-    turn_limit:
-      "인터뷰 질문 한도에 도달했습니다. 현재 근거로 제안을 검토하거나 인터뷰를 삭제하세요.",
-    interview_busy:
-      "다른 인터뷰 작업이 진행 중입니다. 완료된 상태를 다시 불러온 뒤 시도하세요.",
-    operation_superseded:
-      "이 요청보다 최신 작업이 저장되었습니다. 현재 인터뷰를 다시 불러오세요.",
-    request_id_reused:
-      "이 요청 ID가 다른 내용에 사용되었습니다. 입력을 확인하고 새 요청으로 보내세요.",
-    choice_question_not_current:
-      "선택한 제안은 현재 질문에 대한 것이 아닙니다. 최신 질문을 다시 확인하세요.",
-    choice_option_not_found:
-      "선택한 AI 제안을 찾을 수 없습니다. 최신 질문을 다시 불러온 뒤 선택하세요.",
-    stale_revision:
-      "다른 변경이 먼저 저장되었습니다. 작성 중인 답변은 유지했습니다. 최신 상태를 다시 불러오세요.",
-    stale_proposal:
-      "검토한 제안과 서버 제안의 다이제스트가 다릅니다. 저장된 제안을 다시 불러와 검토하세요.",
-    stale_digest:
-      "대상 설계가 검토 후 변경되었습니다. 제안은 유지되며 대상 설계를 다시 불러와 재검토해야 합니다.",
-    scope_not_selected:
-      "워크플로 범위가 아직 선택되지 않았습니다. 인터뷰를 계속해 범위를 확정하세요.",
-    scope_invalid:
-      "저장된 워크플로 범위 형식이 올바르지 않습니다. 인터뷰를 계속해 새 워크플로 범위를 확정하세요.",
-    scope_mismatch:
-      "제안된 워크플로 ID가 선택한 범위와 일치하지 않습니다. 제안을 다시 생성하세요.",
-    proposal_already_applied:
-      "이 제안은 이미 설계에 적용되었습니다. 저장된 설계를 확인하세요.",
-    target_design_not_found:
-      "적용 대상 설계를 찾을 수 없습니다. 제안과 작성 중인 답변은 유지했습니다. 적용 대상을 다시 선택하고 검토하세요.",
-    secret_detected:
-      "비밀로 보이는 값이 감지되어 저장하거나 전송하지 않았습니다. 자격 증명과 토큰을 제거하세요.",
-  };
-  return (
-    messages[cause.code] ??
-    "인터뷰 요청을 완료하지 못했습니다. 현재 상태를 다시 불러온 뒤 시도하세요."
-  );
+  const key = `interview.errors.${cause.code}`;
+  const translated = t(key);
+  return translated === key ? t("interview.genericError") : translated;
 }
 
 function evidenceItems(session: InterviewSession): EvidenceItem[] {
@@ -175,8 +130,8 @@ function proposalDocuments(proposal: InterviewProposal): DesignDocuments {
   };
 }
 
-function formatDate(value: string): string {
-  return new Date(value).toLocaleString("ko-KR");
+function formatDate(value: string, locale: string): string {
+  return new Date(value).toLocaleString(locale === "ko" ? "ko-KR" : "en-US");
 }
 
 function preferredProposal(
@@ -209,6 +164,9 @@ export function InterviewPageContent({
   interviewId,
   navigate = (path) => window.location.assign(path),
 }: InterviewPageContentProps) {
+  const t = useTranslations();
+  const locale = useLocale();
+  const safeError = (cause: unknown) => describeApiError(cause, t);
   const [session, setSession] = useState<InterviewSession | null>(null);
   const [designs, setDesigns] = useState<HarnessDesign[]>([]);
   const [name, setName] = useState("");
@@ -312,7 +270,7 @@ export function InterviewPageContent({
         if (resumePollAttempt + 1 === RESUME_POLL_DELAYS.length) {
           setResumePollingExhausted(true);
           setError(
-            "저장된 작업이 아직 완료되지 않았습니다. 잠시 후 최신 상태를 다시 불러오세요.",
+            t("interview.operationPending"),
           );
           return;
         }
@@ -374,7 +332,7 @@ export function InterviewPageContent({
   function handleTerminalNotFound(id: string): void {
     clearSessionSensitiveState(id);
     setError(
-      "인터뷰가 만료되었거나 삭제되었습니다. 30일 보존 기간이 지난 인터뷰는 다시 열 수 없습니다.",
+      t("interview.expiredOrDeleted"),
     );
   }
 
@@ -423,7 +381,7 @@ export function InterviewPageContent({
         setProposal(null);
         setProposalDraft(null);
         setError(
-          "저장된 제안 요약과 본문의 다이제스트가 다릅니다. 적용하지 말고 관리자에게 확인하세요.",
+          t("interview.proposalDigestMismatch"),
         );
         return;
       }
@@ -459,9 +417,9 @@ export function InterviewPageContent({
         setResumePollingExhausted(false);
         setError(
           hasExpiredRunningOperation(loaded)
-            ? "이전 작업의 실행 임대가 만료되어 중단되었습니다. 저장된 요청을 다시 시도하거나 새 작업을 시작하세요."
+            ? t("interview.leaseExpired")
             : loaded.last_operation?.status === "failed"
-            ? "저장된 작업을 완료하지 못했습니다. 최신 상태를 다시 불러온 뒤 요청을 다시 시도하세요."
+            ? t("interview.operationFailed")
             : null,
         );
       }
@@ -526,11 +484,11 @@ export function InterviewPageContent({
     const normalizedName = name.trim();
     const normalizedCustomerId = customerId.trim();
     if (!normalizedName || !normalizedCustomerId) {
-      setError("인터뷰 이름과 고객 ID를 입력하세요.");
+      setError(t("interview.nameCustomerRequired"));
       return;
     }
     if (selectedStages.length === 0) {
-      setError("최소 한 개의 SDLC 단계를 선택하세요.");
+      setError(t("interviewStart.minStage"));
       return;
     }
     const existing = startOperation ?? readStartOperation();
@@ -775,6 +733,7 @@ export function InterviewPageContent({
           proposal_id: proposal.id,
           expected_proposal_digest: proposal.digest,
           confirm_scope: true,
+          language: locale,
           design_id: targetDesign?.id ?? null,
           expected_design_digest: targetDesign?.digest ?? null,
         },
@@ -868,11 +827,9 @@ export function InterviewPageContent({
     return (
       <div className="page-stack">
         <header className="page-intro">
-          <p className="eyebrow">새 AI 인터뷰</p>
-          <h1 className="workspace-heading">SDLC 인터뷰 시작</h1>
-          <p className="page-description">
-            첫 질문을 요청하기 전에 전송 대상과 보존 경계를 확인합니다.
-          </p>
+          <p className="eyebrow">{t("interview.newInterviewEyebrow")}</p>
+          <h1 className="workspace-heading">{t("interview.startHeading")}</h1>
+          <p className="page-description">{t("interview.startIntro")}</p>
         </header>
         <OperationStatus kind={busy ? "start" : null} />
         <InterviewStartForm
@@ -896,11 +853,11 @@ export function InterviewPageContent({
     return (
       <section className="workspace-panel state-panel" aria-busy={!error}>
         <p className={error ? "error-text" : "muted"}>
-          {error ?? "인터뷰를 불러오는 중입니다."}
+          {error ?? t("interview.loading")}
         </p>
         {error ? (
           <a className="button-secondary" href="/studio/interviews/new">
-            새 인터뷰 시작
+            {t("interview.newInterviewBtn")}
           </a>
         ) : null}
       </section>
@@ -912,15 +869,15 @@ export function InterviewPageContent({
       <section className="workspace-panel interview-session-header">
         <div className="page-header">
           <div>
-            <p className="eyebrow">AI 인터뷰 · 리비전 {session.revision}</p>
+            <p className="eyebrow">{t("interview.sessionEyebrow", { revision: session.revision })}</p>
             <h1 className="workspace-heading">{session.name}</h1>
             <p className="page-description">
-              고객 ID {session.customer_id} · {formatDate(session.updated_at)} 저장 ·{" "}
-              {formatDate(session.expires_at)} 만료
+              {t("interview.savedAt", { customer: session.customer_id, updated: formatDate(session.updated_at, locale) })}
+              {t("interview.expiresAt", { expires: formatDate(session.expires_at, locale) })}
             </p>
           </div>
           <a className="button-secondary" href="/studio">
-            스튜디오로
+            {t("interview.toStudio")}
           </a>
         </div>
         {error ? (
@@ -932,7 +889,7 @@ export function InterviewPageContent({
               disabled={busy}
               onClick={() => void loadSession()}
             >
-              최신 상태 다시 불러오기
+              {t("interview.reloadLatest")}
             </button>
           </div>
         ) : null}
@@ -950,7 +907,7 @@ export function InterviewPageContent({
         onConfirm={
           mutationBusy ? undefined : (id) => void decideEvidence(id, "confirm")
         }
-        boundary="질문, 답변, 근거 출처는 서버에 저장된 실제 인터뷰 기록입니다."
+        boundary={t("interview.boundary")}
         conversation={
           <div className="turn-list" aria-live="polite">
             {session.turns.map((turn) => (
@@ -960,7 +917,7 @@ export function InterviewPageContent({
                 key={turn.id}
               >
                 <p className="turn-role">
-                  {turn.role === "assistant" ? "질문" : "답변"}
+                  {turn.role === "assistant" ? t("interview.questionLabel") : t("interview.answerLabel")}
                 </p>
                 <p>{turn.text}</p>
               </article>
@@ -999,8 +956,8 @@ export function InterviewPageContent({
 
       {session.proposed_evidence.length > 0 ? (
         <section className="workspace-panel">
-          <p className="eyebrow">사람의 확인 필요</p>
-          <h2>제안된 근거 결정</h2>
+          <p className="eyebrow">{t("interview.humanConfirmEyebrow")}</p>
+          <h2>{t("interview.proposedEvidenceHeading")}</h2>
           {session.proposed_evidence.map((item) => (
             <div className="review-row" key={item.id}>
               <p>{item.statement}</p>
@@ -1011,7 +968,7 @@ export function InterviewPageContent({
                   disabled={mutationBusy}
                   onClick={() => void decideEvidence(item.id, "confirm")}
                 >
-                  사실 확인
+                  {t("evidence.confirmFact")}
                 </button>
                 <button
                   className="button-secondary"
@@ -1019,7 +976,7 @@ export function InterviewPageContent({
                   disabled={mutationBusy}
                   onClick={() => void decideEvidence(item.id, "reject")}
                 >
-                  근거 거절
+                  {t("interview.rejectEvidence")}
                 </button>
               </div>
             </div>
@@ -1029,11 +986,9 @@ export function InterviewPageContent({
 
       <section className="workspace-panel proposal-action">
         <div>
-          <p className="eyebrow">명시적 제안 생성</p>
-          <h2>현재 확인 근거로 설계 제안 만들기</h2>
-          <p className="muted">
-            이 버튼을 누를 때만 모델이 프로필, 워크플로, 시나리오 초안을 생성합니다.
-          </p>
+          <p className="eyebrow">{t("interview.explicitProposalEyebrow")}</p>
+          <h2>{t("interview.makeProposalHeading")}</h2>
+          <p className="muted">{t("interview.proposalHint")}</p>
         </div>
         <button
           className="button-primary"
@@ -1041,23 +996,23 @@ export function InterviewPageContent({
           disabled={mutationBusy}
           onClick={() => void generateProposal()}
         >
-          {proposalOperation ? "저장된 제안 요청 다시 시도" : "설계 제안 생성"}
+          {proposalOperation ? t("interview.retryProposal") : t("interview.generateProposal")}
         </button>
       </section>
 
       {session.proposals.length > 0 ? (
         <section className="workspace-panel">
           <label className="field">
-            <span>검토할 저장된 제안</span>
+            <span>{t("interview.savedProposalLabel")}</span>
             <select
-              aria-label="검토할 저장된 제안"
+              aria-label={t("interview.savedProposalLabel")}
               value={proposal?.id ?? ""}
               disabled={mutationBusy}
               onChange={(event) => void selectProposal(event.target.value)}
             >
               {session.proposals.map((item) => (
                 <option value={item.id} key={item.id}>
-                  리비전 {item.revision} · {item.status} · {item.digest.slice(0, 12)}
+                  {t("interview.proposalOption", { revision: item.revision, status: item.status, digest: item.digest.slice(0, 12) })}
                 </option>
               ))}
             </select>
@@ -1068,13 +1023,10 @@ export function InterviewPageContent({
       {proposal && proposalDraft ? (
         <>
           <section className="workspace-panel proposal-review-header">
-            <p className="eyebrow">정확한 제안 검토</p>
-            <h2>제안 다이제스트</h2>
+            <p className="eyebrow">{t("interview.exactProposalEyebrow")}</p>
+            <h2>{t("interview.proposalDigestHeading")}</h2>
             <code className="digest-text">{proposal.digest}</code>
-            <p>
-              아래 문서는 읽기 전용입니다. 적용 요청은 서버에 저장된 이 정확한
-              다이제스트를 사용하며, 설계 승인과는 별개입니다.
-            </p>
+            <p>{t("interview.proposalReadonlyNote")}</p>
           </section>
           <StructuredDesignEditors
             documents={proposalDraft}
@@ -1089,9 +1041,9 @@ export function InterviewPageContent({
           />
           <section className="workspace-panel apply-panel">
             <label className="field">
-              <span>적용 대상</span>
+              <span>{t("interview.applyTarget")}</span>
               <select
-                aria-label="적용 대상"
+                aria-label={t("interview.applyTarget")}
                 value={targetDesignId}
                 disabled={mutationBusy}
                 onChange={(event) => {
@@ -1099,17 +1051,19 @@ export function InterviewPageContent({
                   setTargetStale(false);
                 }}
               >
-                <option value={NEW_DESIGN}>새 설계 만들기</option>
-                {designs.map((design) => (
-                  <option value={design.id} key={design.id}>
-                    기존 설계 · {design.name}
-                  </option>
-                ))}
+                <option value={NEW_DESIGN}>{t("interview.newDesignOption")}</option>
+                {designs
+                  .filter((design) => design.language === locale)
+                  .map((design) => (
+                    <option value={design.id} key={design.id}>
+                      {t("interview.existingDesignOption", { name: design.name })}
+                    </option>
+                  ))}
               </select>
             </label>
             <p className="muted">
-              대상 현재 다이제스트:{" "}
-              <code>{targetDesign?.digest ?? "새 설계에는 기존 다이제스트 없음"}</code>
+              {t("interview.targetCurrentDigest")}
+              <code>{targetDesign?.digest ?? t("interview.noExistingDigest")}</code>
             </p>
             {targetStale && targetDesign ? (
               <button
@@ -1118,7 +1072,7 @@ export function InterviewPageContent({
                 disabled={busy}
                 onClick={() => void reloadTargetDesign()}
               >
-                대상 설계 다시 불러오기
+                {t("interview.reloadTargetDesign")}
               </button>
             ) : null}
             <label className="consent-check">
@@ -1133,9 +1087,7 @@ export function InterviewPageContent({
                 }
               />
               <span>
-                제안 {proposal.digest.slice(0, 12)}, 워크플로 범위{" "}
-                {session.scope ?? "미선택"}, 위 대상 다이제스트를 함께 검토했습니다.
-                이는 이후 설계 승인과 다릅니다.
+                {t("interview.reviewSummary", { digest: proposal.digest.slice(0, 12), scope: session.scope ?? t("interview.scopeUnselected") })}
               </span>
             </label>
             <button
@@ -1144,7 +1096,7 @@ export function InterviewPageContent({
               disabled={!scopeConfirmed || mutationBusy || targetStale}
               onClick={() => void applyProposal()}
             >
-              정확한 제안 적용
+              {t("interview.applyExactProposal")}
             </button>
           </section>
         </>
@@ -1152,11 +1104,9 @@ export function InterviewPageContent({
 
       <section className="workspace-panel danger-panel">
         <div>
-          <p className="eyebrow">보존 관리</p>
-          <h2>인터뷰 삭제</h2>
-          <p className="muted">
-            대화와 미적용 제안을 삭제합니다. 이미 적용한 설계는 유지됩니다.
-          </p>
+          <p className="eyebrow">{t("interview.retentionEyebrow")}</p>
+          <h2>{t("interview.deleteHeading")}</h2>
+          <p className="muted">{t("interview.deleteNote")}</p>
         </div>
         {deleteArmed ? (
           <div className="actions-row">
@@ -1166,7 +1116,7 @@ export function InterviewPageContent({
               disabled={mutationBusy}
               onClick={() => void deleteInterview()}
             >
-              인터뷰 영구 삭제
+              {t("interview.deletePermanently")}
             </button>
             <button
               className="button-secondary"
@@ -1174,7 +1124,7 @@ export function InterviewPageContent({
               disabled={mutationBusy}
               onClick={() => setDeleteArmed(false)}
             >
-              취소
+              {t("interview.cancel")}
             </button>
           </div>
         ) : (
@@ -1184,7 +1134,7 @@ export function InterviewPageContent({
             disabled={mutationBusy}
             onClick={() => setDeleteArmed(true)}
           >
-            삭제 확인
+            {t("interview.confirmDelete")}
           </button>
         )}
       </section>

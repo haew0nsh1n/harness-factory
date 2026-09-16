@@ -1,4 +1,7 @@
+"use client";
+
 import type { EvidenceItem } from "@/components/studio/InterviewWorkspace";
+import { useTranslations } from "@/i18n/I18nProvider";
 
 export interface EvidenceRailProps {
   items: EvidenceItem[];
@@ -8,28 +11,28 @@ export interface EvidenceRailProps {
 
 const GROUPS: Array<{
   kind: EvidenceItem["kind"];
-  label: string;
-  emptyLabel: string;
+  labelKey: string;
+  emptyKey: string;
 }> = [
   {
     kind: "confirmed",
-    label: "확인된 사실",
-    emptyLabel: "확인된 사실이 없습니다.",
+    labelKey: "evidence.confirmedLabel",
+    emptyKey: "evidence.confirmedEmpty",
   },
   {
     kind: "assumption",
-    label: "가정",
-    emptyLabel: "기록된 가정이 없습니다.",
+    labelKey: "evidence.assumptionLabel",
+    emptyKey: "evidence.assumptionEmpty",
   },
   {
     kind: "unknown",
-    label: "미확인",
-    emptyLabel: "미확인 항목이 없습니다.",
+    labelKey: "evidence.unknownLabel",
+    emptyKey: "evidence.unknownEmpty",
   },
   {
     kind: "proposed",
-    label: "검토할 제안",
-    emptyLabel: "검토할 제안이 없습니다.",
+    labelKey: "evidence.proposedLabel",
+    emptyKey: "evidence.proposedEmpty",
   },
 ];
 
@@ -38,6 +41,7 @@ export function EvidenceRail({
   onConfirm,
   kinds,
 }: EvidenceRailProps) {
+  const t = useTranslations();
   const visibleGroups = kinds
     ? GROUPS.filter((group) => kinds.includes(group.kind))
     : GROUPS;
@@ -45,7 +49,7 @@ export function EvidenceRail({
   if (items.length === 0) {
     return (
       <div className="evidence-empty">
-        <p className="muted">저장된 근거가 없습니다.</p>
+        <p className="muted">{t("evidence.noEvidence")}</p>
       </div>
     );
   }
@@ -62,13 +66,13 @@ export function EvidenceRail({
             aria-labelledby={`evidence-${group.kind}-heading`}
           >
             <div className="evidence-group-heading">
-              <h3 id={`evidence-${group.kind}-heading`}>{group.label}</h3>
-              <span aria-label={`${group.label} ${groupItems.length}개`}>
+              <h3 id={`evidence-${group.kind}-heading`}>{t(group.labelKey)}</h3>
+              <span aria-label={t("evidence.countAria", { label: t(group.labelKey), count: groupItems.length })}>
                 {groupItems.length}
               </span>
             </div>
             {groupItems.length === 0 ? (
-              <p className="evidence-group-empty">{group.emptyLabel}</p>
+              <p className="evidence-group-empty">{t(group.emptyKey)}</p>
             ) : (
               <ul>
                 {groupItems.map((item) => (
@@ -79,16 +83,16 @@ export function EvidenceRail({
                         <span className="source-links">
                           {item.sourceTurnIds.map((turnId, index) => (
                             <a href={`#turn-${turnId}`} key={turnId}>
-                              출처 {index + 1}: {turnId}
+                              {t("evidence.sourceIndexed", { index: index + 1, turnId })}
                             </a>
                           ))}
                         </span>
                       ) : item.sourceTurnId ? (
                         <a href={`#turn-${item.sourceTurnId}`}>
-                          출처: {item.sourceTurnId}
+                          {t("evidence.source", { turnId: item.sourceTurnId })}
                         </a>
                       ) : (
-                        <span>저장된 프로필</span>
+                        <span>{t("evidence.savedProfile")}</span>
                       )}
                       {item.kind === "proposed" && onConfirm ? (
                         <button
@@ -96,7 +100,7 @@ export function EvidenceRail({
                           type="button"
                           onClick={() => onConfirm(item.id)}
                         >
-                          사실 확인
+                          {t("evidence.confirmFact")}
                         </button>
                       ) : null}
                     </div>
