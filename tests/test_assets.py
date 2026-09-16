@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 import re
 import unittest
@@ -70,6 +71,71 @@ class AssetTests(unittest.TestCase):
                         self.catalog_root / row["path"], row["id"]
                     )
                     self.assertEqual(report["bundles"][row["id"]], bundle["digest"])
+
+    def test_curated_reference_index_is_pinned_hashed_and_reviewed(self):
+        index = load_json(ROOT / "catalog/references/index.json")
+        self.assertEqual(set(index), {"schema_version", "references"})
+        self.assertEqual(index["schema_version"], 1)
+        expected_sources = {
+            (row["source"]["url"], row["source"]["revision"], row["source"]["path"])
+            for row in self.catalog["skills"]
+        }
+        self.assertEqual(len(index["references"]), len(expected_sources))
+        self.assertEqual(
+            {
+                (
+                    reference["source"]["url"],
+                    reference["source"]["revision"],
+                    reference["source"]["path"],
+                )
+                for reference in index["references"]
+            },
+            expected_sources,
+        )
+        self.assertEqual(
+            len({reference["id"] for reference in index["references"]}),
+            len(index["references"]),
+        )
+        for reference in index["references"]:
+            self.assertEqual(set(reference), {
+                "id", "capabilities", "source", "snapshot", "sha256",
+                "license_file", "adopt", "exclude", "review_status",
+            })
+            self.assertEqual(
+                set(reference["source"]), {"url", "revision", "path", "license"}
+            )
+            for field in ("capabilities", "adopt", "exclude"):
+                self.assertIsInstance(reference[field], list)
+                self.assertTrue(reference[field])
+                self.assertTrue(all(isinstance(value, str) and value for value in reference[field]))
+            self.assertRegex(reference["source"]["revision"], r"^[a-f0-9]{40}$")
+            reference_root = ROOT / "catalog/references"
+            path = relative_path(reference_root, reference["snapshot"], "snapshot")
+            self.assertEqual(reference["sha256"], hashlib.sha256(path.read_bytes()).hexdigest())
+            self.assertEqual(reference["source"]["license"], "MIT")
+            license_path = relative_path(
+                reference_root, reference["license_file"], "license_file"
+            )
+            license_text = license_path.read_text(encoding="utf-8")
+            self.assertIn("Permission is hereby granted", license_text)
+            self.assertIn("THE SOFTWARE IS PROVIDED", license_text)
+            self.assertEqual(reference["review_status"], "reviewed")
+            self.assertTrue(reference["adopt"])
+            self.assertTrue(reference["exclude"])
+
+    def test_curated_reference_library_contains_only_non_executable_assets(self):
+        reference_root = ROOT / "catalog/references"
+        index = load_json(reference_root / "index.json")
+        expected = {reference_root / "index.json"}
+        for reference in index["references"]:
+            expected.add(relative_path(reference_root, reference["snapshot"], "snapshot"))
+            expected.add(relative_path(reference_root, reference["license_file"], "license_file"))
+        actual = {path for path in reference_root.rglob("*") if path.is_file()}
+        self.assertEqual(actual, expected)
+        for path in actual:
+            with self.subTest(path=path):
+                self.assertIn(path.suffix, {".json", ".md", ".txt"})
+                self.assertEqual(path.stat().st_mode & 0o111, 0)
 
     def test_example_validates_when_selected_behavior_evidence_is_verified(self):
         profile = load_json(ROOT / "examples/github-issue/profile.json")
