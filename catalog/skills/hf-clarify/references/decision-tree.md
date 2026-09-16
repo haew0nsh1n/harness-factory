@@ -31,6 +31,10 @@ Do not ask a downstream question whose answer depends on an unresolved upstream
 choice. Do not ask the customer for a fact that an authorized local read can
 establish.
 
+When a shared term maps to multiple operations (for example, several different
+"import" flows), operation disambiguation is upstream of ownership and
+performance-target decisions. Ask that single scope question first.
+
 ## Contradictions and stopping
 
 For a contradiction, record both claims and their evidence IDs, identify the

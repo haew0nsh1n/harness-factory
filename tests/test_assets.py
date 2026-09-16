@@ -189,6 +189,21 @@ class AssetTests(unittest.TestCase):
         self.assertIn(normal_branch, text)
         self.assertLess(text.index(uncertain_branch), text.index(normal_branch))
 
+    def test_clarify_disambiguates_operation_before_owner_or_timing(self):
+        skill = (
+            self.catalog_root / "skills/hf-clarify/SKILL.md"
+        ).read_text(encoding="utf-8")
+        reference = (
+            self.catalog_root / "skills/hf-clarify/references/decision-tree.md"
+        ).read_text(encoding="utf-8")
+        normalized_skill = " ".join(skill.split())
+
+        sequencing_rule = "must disambiguate the target operation before ownership"
+        blocker_rule = "immediate prerequisite for the current frontier decision"
+        self.assertIn(sequencing_rule, normalized_skill)
+        self.assertIn(blocker_rule, normalized_skill)
+        self.assertIn("operation disambiguation is upstream", reference)
+
     def test_plan_supports_validation_only_tasks(self):
         paths = [
             "skills/hf-plan/SKILL.md",
