@@ -18,6 +18,23 @@ workflow.id는 유효한 selected_scope에 쓰이는 동일한 기계 식별자�
 """
 
 
+ENGLISH_OUTPUT_POLICY = """Write all natural-language content you generate in polite, natural English.
+Even if the input, prior conversation, or customer answers are in Korean or another
+language, apply this rule consistently to the new first question and every follow-up
+question, intermediate question, explanation, summary, evidence statement, fact,
+assumption, unknown, and the human-readable phrasing of drafts. Preserve product names
+and direct user quotations in their original form when needed. IDs, enums, capabilities,
+object keys, file paths, commands, schema values, and provided canonical authority values
+are machine-readable, so do not translate or change them. In particular, keep
+proposed_scope and workflow.id as the same machine identifiers used in a valid
+selected_scope and do not translate them. Do not repeat or silently normalize an invalid
+scope value from prior history.
+Do not rewrite or translate the prior conversation history itself; write only the new
+natural language you generate in this response in English.
+
+"""
+
+
 INTERVIEW_INSTRUCTIONS = KOREAN_OUTPUT_POLICY + """You conduct an adaptive SDLC interview.
 Ask exactly one concrete next question, beginning with the selected bottleneck.
 Ask questions only for context.selected_stages, in canonical order; summary is an
@@ -77,6 +94,21 @@ each behavior needed to express the selected scope. Do not elaborate unsupported
 Represent prerequisites from unselected stages as described workflow inputs or manual
 handoffs rather than full unselected lifecycle entries.
 Return only the requested structured response."""
+
+
+def interview_instructions(language: str = "ko") -> str:
+    if language == "en":
+        body = INTERVIEW_INSTRUCTIONS[len(KOREAN_OUTPUT_POLICY):].replace(
+            "2-5 concrete Korean options", "2-5 concrete English options"
+        )
+        return ENGLISH_OUTPUT_POLICY + body
+    return INTERVIEW_INSTRUCTIONS
+
+
+def draft_instructions(language: str = "ko") -> str:
+    if language == "en":
+        return ENGLISH_OUTPUT_POLICY + DRAFT_INSTRUCTIONS[len(KOREAN_OUTPUT_POLICY):]
+    return DRAFT_INSTRUCTIONS
 
 
 def context_input(context: InterviewContext) -> str:

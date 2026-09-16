@@ -25,10 +25,10 @@ from .errors import InterviewModelError
 from .catalog import validate_catalog_references
 from .model import InterviewContext
 from .prompts import (
-    DRAFT_INSTRUCTIONS,
-    INTERVIEW_INSTRUCTIONS,
     context_input,
     draft_input,
+    draft_instructions,
+    interview_instructions,
 )
 from .schemas import (
     DraftCandidate,
@@ -74,12 +74,13 @@ class AzureOpenAIInterviewModel:
     async def next_question(self, context: InterviewContext) -> InterviewReply:
         self._validate_context(context)
         input_text = context_input(context)
-        self._validate_assembled_input(INTERVIEW_INSTRUCTIONS, input_text)
+        instructions = interview_instructions(context.language)
+        self._validate_assembled_input(instructions, input_text)
 
         async def operation() -> InterviewReply:
             wire_result = await self._parse(
                 text_format=WireInterviewReply,
-                instructions=INTERVIEW_INSTRUCTIONS,
+                instructions=instructions,
                 input_text=input_text,
                 max_output_tokens=TURN_OUTPUT_TOKENS,
             )
@@ -103,12 +104,13 @@ class AzureOpenAIInterviewModel:
     ) -> DraftCandidate:
         self._validate_context(context)
         input_text = draft_input(context, catalog)
-        self._validate_assembled_input(DRAFT_INSTRUCTIONS, input_text)
+        instructions = draft_instructions(context.language)
+        self._validate_assembled_input(instructions, input_text)
 
         async def operation() -> DraftCandidate:
             wire_result = await self._parse(
                 text_format=WireDraftCandidate,
-                instructions=DRAFT_INSTRUCTIONS,
+                instructions=instructions,
                 input_text=input_text,
                 max_output_tokens=DRAFT_OUTPUT_TOKENS,
                 reasoning_effort="low",

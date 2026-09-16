@@ -503,6 +503,7 @@ export function InterviewPageContent({
             customer_id: normalizedCustomerId,
             consent_version: CONSENT_VERSION,
             consent_accepted: true as const,
+            language: locale,
             selected_stages: selectedStages,
             request_id: requestId(),
           };

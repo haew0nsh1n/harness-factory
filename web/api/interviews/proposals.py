@@ -57,6 +57,37 @@ def _aware(value: datetime) -> datetime:
     return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
 
 
+_SCOPE_FINDING_MESSAGES: dict[str, dict[str, str]] = {
+    "scope-not-selected": {
+        "ko": "이 제안을 적용하기 전에 생성 범위를 선택하고 확정하세요.",
+        "en": (
+            "Select and confirm the generation scope before applying "
+            "this proposal."
+        ),
+    },
+    "scope-mismatch": {
+        "ko": "제안된 워크플로우가 선택한 범위와 일치하지 않습니다.",
+        "en": "The proposed workflow does not match the selected scope.",
+    },
+    "scope-confirmation-required": {
+        "ko": (
+            "이 제안을 그대로 적용하면 생성 범위만 확정되며, 정밀 다이제스트 "
+            "설계 리뷰는 별도로 진행됩니다."
+        ),
+        "en": (
+            "Applying this exact proposal confirms only its generation "
+            "scope; exact-digest design review remains separate."
+        ),
+    },
+}
+
+
+def _scope_finding_message(code: str, language: str) -> str:
+    variants = _SCOPE_FINDING_MESSAGES[code]
+    return variants.get(language, variants["en"])
+
+
+
 def _sha256(value: object) -> str:
     import hashlib
 
@@ -619,9 +650,8 @@ class ProposalService:
                 {
                     "field": "workflow.approved",
                     "code": "scope-not-selected",
-                    "message": (
-                        "Select and confirm the generation scope before applying "
-                        "this proposal."
+                    "message": _scope_finding_message(
+                        "scope-not-selected", session.language
                     ),
                 }
             )
@@ -630,7 +660,9 @@ class ProposalService:
                 {
                     "field": "workflow.id",
                     "code": "scope-mismatch",
-                    "message": "The proposed workflow does not match the selected scope.",
+                    "message": _scope_finding_message(
+                        "scope-mismatch", session.language
+                    ),
                 }
             )
         else:
@@ -638,9 +670,8 @@ class ProposalService:
                 {
                     "field": "workflow.approved",
                     "code": "scope-confirmation-required",
-                    "message": (
-                        "Applying this exact proposal confirms only its generation "
-                        "scope; exact-digest design review remains separate."
+                    "message": _scope_finding_message(
+                        "scope-confirmation-required", session.language
                     ),
                 }
             )
@@ -839,6 +870,7 @@ class ProposalService:
             ),
             stage=session.stage,
             selected_scope=session.selected_scope,
+            language=session.language,
             selected_stages=stored_stages(session.selected_stages_json),
         )
 
