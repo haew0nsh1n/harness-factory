@@ -10,6 +10,11 @@ from harness_factory.skill_bundle import validate_skill_bundle
 
 
 ROOT = Path(__file__).resolve().parents[1]
+EXPECTED_LICENSE_NOTICE_SHA256 = {
+    "licenses/gstack.txt": "e56fbb5b3d95756f3fa1cfefa24732ec79f18ece1ad08a4e79e00df57e8b198c",
+    "licenses/mattpocock.txt": "0e7ac423bf2c6e223b7c5b156f8cf72da49d748e56a1641402c31f22ad07dbb5",
+    "licenses/superpowers.txt": "a37e0e9697144819e1d965176ac4ae5bc3fa02d11e7812036bbcadf6dafe2400",
+}
 
 
 class AssetTests(unittest.TestCase):
@@ -135,12 +140,28 @@ class AssetTests(unittest.TestCase):
             license_path = relative_path(
                 reference_root, reference["license_file"], "license_file"
             )
-            license_text = license_path.read_text(encoding="utf-8")
+            expected_license_sha256 = EXPECTED_LICENSE_NOTICE_SHA256[reference["license_file"]]
+            license_bytes = license_path.read_bytes()
+            self.assertEqual(
+                hashlib.sha256(license_bytes).hexdigest(),
+                expected_license_sha256,
+            )
+            license_text = license_bytes.decode("utf-8")
             self.assertIn("Permission is hereby granted", license_text)
             self.assertIn("THE SOFTWARE IS PROVIDED", license_text)
             self.assertEqual(reference["review_status"], "reviewed")
             self.assertTrue(reference["adopt"])
             self.assertTrue(reference["exclude"])
+
+    def test_curated_reference_license_notice_digest_pins_detect_byte_changes(self):
+        reference_root = ROOT / "catalog/references"
+        for license_file, expected_sha256 in EXPECTED_LICENSE_NOTICE_SHA256.items():
+            with self.subTest(license_file=license_file):
+                path = relative_path(reference_root, license_file, "license_file")
+                self.assertNotEqual(
+                    hashlib.sha256(path.read_bytes() + b"\n").hexdigest(),
+                    expected_sha256,
+                )
 
     def test_curated_reference_library_contains_only_non_executable_assets(self):
         reference_root = ROOT / "catalog/references"
