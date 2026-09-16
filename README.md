@@ -25,6 +25,32 @@ Copilot CLI용 하네스로 만드는 웹 플랫폼입니다. 스튜디오에서
 Git + Markdown 이슈를 위한 스킬이 포함됩니다. 고객별 규칙은 기본 스킬을
 변경하지 않고 별도 생성 스킬로 추가됩니다.
 
+## 이슈 트래커 선택
+
+인터뷰에서 다음 중 하나를 source of truth로 확정합니다. GitHub Issues와
+Jira는 고객이 승인한 호환 skill을 먼저 확인하고, 없으면 승인된 MCP 연결을
+선택합니다. 연결은 프로필에 고정되며 실행 중 자동 전환하지 않습니다.
+
+| Choice | Preferred connection | Fallback | Default storage |
+| --- | --- | --- | --- |
+| Git + Markdown | bundled `hf-issues-markdown` | manual | `issues/<issue-id>.md` |
+| GitHub Issues | approved compatible skill | `mcp:github` | GitHub repository |
+| Jira | approved compatible skill | `mcp:jira` | Jira project |
+
+```bash
+python3 -m harness_factory tracker-guide \
+  --profile examples/github-issue/profile.json --target .
+python3 -m harness_factory preflight --package PACKAGE
+python3 -m harness_factory delivery-check --package PACKAGE
+```
+
+skill 파일이나 MCP 이름의 존재는 provider 호환성, 인증, 권한 또는 capability
+검증이 아닙니다. `/mcp` 인증은 고객의 승인된 네이티브 방식으로 수행하고
+자격 증명을 프로필이나 패키지에 저장하지 않습니다. 연결 방식을 바꾸려면
+프로필을 다시 검토하고 패키지를 재생성해야 합니다.
+
+## 제공하는 기본 스킬
+
 ## 로컬에서 웹 실행
 
 Docker와 Docker Compose가 필요합니다.
