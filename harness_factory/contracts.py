@@ -369,6 +369,8 @@ def _validate_profile_tracker(profile):
 
 
 def _validate(profile, workflow, catalog, root):
+    from .skill_bundle import validate_skill_bundle
+
     known_tools, tracker, tracker_tools, tracker_write_tools = _validate_profile_tracker(profile)
 
     shape(catalog, "schema_version skills", "catalog")
@@ -392,6 +394,8 @@ def _validate(profile, workflow, catalog, root):
         for child in directory.rglob("*"):
             no_symlinks(child)
             require(child.is_dir() or child.is_file(), "catalog.skills.path: unsupported file")
+        _validate_skill_references(directory)
+        validate_skill_bundle(directory, skill["id"])
         for key in ("inputs", "outputs"):
             strings(skill[key], "catalog.skills." + key, ids=True)
         strings(skill["requires"], "catalog.skills.requires")
@@ -436,7 +440,6 @@ def _validate(profile, workflow, catalog, root):
             "catalog.skills.compatibility.status: selected skill must be verified",
         )
         _validate_evidence(root, markdown_skill)
-        _validate_skill_references(root / markdown_skill["path"])
 
     shape(workflow, "schema_version id name customer_id goal trigger inputs outputs customer_rules approved steps traceability",
           "workflow")
