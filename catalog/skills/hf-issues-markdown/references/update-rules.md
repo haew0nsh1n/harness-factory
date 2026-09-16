@@ -1,6 +1,6 @@
 # Lossless issue update rules
 
-Read this reference before creating or updating a local Markdown issue.
+Read this reference before reading, creating, or updating a local Markdown issue.
 
 ## Path and identity validation
 
@@ -27,10 +27,20 @@ template; updates do not regenerate the whole file from the template.
 
 ## Conflicts and duplicates
 
-Keep evidence of the bytes or digest originally read. Immediately before write,
-verify the target still matches that evidence. If not, report a conflict and ask
-for a refreshed request; do not overwrite, silently merge, or choose one version.
-If multiple files claim the same `id`, stop and report every observed candidate.
+For create, use an authorized no-clobber operation that atomically creates the
+target only if it does not exist. A prior existence check followed by an
+unconditional write is not sufficient.
+
+For update, keep the bytes, digest, or version originally read and use an
+authorized conditional replacement that atomically replaces the target only if
+that observed version is still current. A changed target is a conflict: retain
+both versions as evidence, report the conflict, and request reconciliation; do
+not overwrite, silently merge, or choose one version.
+
+Use only a repository or runtime mechanism whose atomic guarantee has been
+verified for the target. Block the write when either guarantee is unavailable
+for the requested operation. If multiple files claim the same `id`, stop and
+report every observed candidate.
 
 After an authorized write, re-read the file and validate identity, schema,
 required sections, preserved content, requested changes, and safe path. Report

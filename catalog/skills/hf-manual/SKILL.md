@@ -21,21 +21,26 @@ dashboard path, command, connector, account, permission, or completion evidence.
 
 ## Ordered workflow
 
-1. Confirm the named owner is authorized for this exact action and that required
+1. Check for an earlier uncertain write before preparing a normal handoff. If a
+   prior write timed out or its result is unknown, read
+   [references/uncertain-writes.md](references/uncertain-writes.md), record
+   `uncertain`, do not retry, and reconcile the original operation through an
+   authorized read or human confirmation. If the result remains unknown, stop.
+2. If reconciliation proves the original effect exists, skip the normal handoff
+   and continue only to completion-evidence validation. If it proves no effect
+   occurred, return to the applicable approval gate before another attempt.
+3. Confirm the named owner is authorized for this exact action and that required
    inputs identify the reviewed version to act on.
-2. If approval is required before the action, wait for an explicit decision from
+4. If approval is required before the action, wait for an explicit decision from
    the named role. Denial records `cancelled`; silence records
    `awaiting-approval`.
-3. Define the ordered human procedure from verified customer instructions. Name
+5. Define the ordered human procedure from verified customer instructions. Name
    each prerequisite, human action, produced value, and safe evidence to return.
    If a step is unknown, say so and request verification instead of inventing it.
-4. Read [templates/handoff.md](templates/handoff.md), write the handoff, record
+6. If no prior write is uncertain, read
+   [templates/handoff.md](templates/handoff.md), write the normal handoff, record
    `awaiting-manual`, and stop. Do not perform the action on the human's behalf.
-5. If a prior write timed out or its result is unknown, read
-   [references/uncertain-writes.md](references/uncertain-writes.md). Record
-   `uncertain`, do not retry, and reconcile the original operation through an
-   authorized read or human confirmation.
-6. Resume only when the specified completion evidence is returned and checked to
+7. Resume only when the specified completion evidence is returned and checked to
    the extent authorized. Report anything that could not be verified.
 
 ## Output and resume evidence

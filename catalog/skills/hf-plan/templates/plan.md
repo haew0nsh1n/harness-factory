@@ -10,11 +10,11 @@
 - Required outcome: `<approved outcome>`
 - Excluded work: `<approved exclusion>`
 
-## Verified project surfaces
+## Project surfaces
 
-| Surface ID | Observed file or interface | Evidence ID |
-| --- | --- | --- |
-| `<surface-id>` | `<observed project-relative path or interface>` | `<evidence-id>` |
+| Surface ID | Disposition | File or interface | Evidence IDs |
+| --- | --- | --- | --- |
+| `<surface-id>` | `<observed-existing|approved-proposed>` | `<observed or proposed project-relative path or interface>` | `<observation ID and, for a proposal, brief authorization ID>` |
 
 ## Tasks
 
@@ -23,13 +23,12 @@
 - Inputs: `<semantic artifact IDs>`
 - Depends on: `<task IDs or none>`
 - Target surfaces: `<verified surface IDs>`
-- Write the focused test: `<assertion and fixture derived from the brief>`
-- Red command: `<exact command observed in project tooling>`
-- Expected red evidence: `<missing-behavior failure signature>`
-- Minimal implementation: `<bounded change>`
-- Green command: `<exact focused command>`
-- Green criterion: `<observable successful outcome>`
-- Regression selectors: `<exact observed selectors and rationale>`
+- Verification mode: `<red-green|validation-only>`
+- Red-green branch: `<focused test, exact command, expected missing-behavior
+  failure, minimal implementation, green criterion, and regression selectors;
+  or not applicable>`
+- Validation-only branch: `<artifact contract, exact authorized validation
+  command or inspection, acceptance criterion, and evidence; or not applicable>`
 - Outputs: `<implementation artifact ID>, <test-results artifact ID>`
 - Failure or manual gate: `<blocker and resume evidence or none>`
 

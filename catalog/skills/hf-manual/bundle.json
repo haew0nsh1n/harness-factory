@@ -1,7 +1,7 @@
 {
-  "digest": "7803a66065e344e22fc8cd94478dc213c784503775b722389eadc4c4f2ff61e2",
+  "digest": "83ee9b364e8af028549f3903b338cfd8ae63aad9955ee9fea300b78f26a68cbf",
   "resources": {
-    "SKILL.md": "fcc01e8007645c4a5b8210f33269f76bc54d6fe31cb7752f681a7a94799d4450",
+    "SKILL.md": "2fa64b5e1cab81ddbb439e67a861f9cd89f06a42afdf236422cf5f49e31fe850",
     "references/uncertain-writes.md": "fbf4d672c8fc7dbcc39f5a31e67a5b85656237cea82cc0ef3f043de2917ea16c",
     "templates/handoff.md": "6fed2b58a26936416f6f55271d0251eee0e8f769d7f86b8d768abdd06477192d"
   },

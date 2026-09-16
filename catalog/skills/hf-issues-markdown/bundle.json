@@ -1,8 +1,8 @@
 {
-  "digest": "6183b0f24a39386e57493d478f480b916ed0dcd1fc9a68d3c5d65e9b4bd8d6c4",
+  "digest": "6f810d8541787286eaafb52114e516d3de2f911f2baeb7ba5735296cf24870c7",
   "resources": {
-    "SKILL.md": "0ee20c250beabe90b224fb90e541097c3488f31b5a448dbba4af31963cd0b477",
-    "references/update-rules.md": "cbfc9dcb388378675babcd7556836277797b726df90193f231b46549128e0f01",
+    "SKILL.md": "b4bbbe4f5bf3be0e1b562e1ff84b07146247747d19796257953bcad37540cc63",
+    "references/update-rules.md": "fd4ea9c03c8f96440fa5d996b76a0ae5dd0c0272de32ed98851ecc3e70ea81e6",
     "templates/issue.md": "149d53cc11b0fb2ee6e069ac220b05e99170939bacd5d165bf4a502c986efb2c"
   },
   "schema_version": 2,

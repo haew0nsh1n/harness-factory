@@ -160,6 +160,51 @@ class AssetTests(unittest.TestCase):
                 self.assertIn(resource, entry)
             validate_skill_bundle(root, skill_id)
 
+    def test_manual_checks_uncertain_write_before_normal_handoff(self):
+        text = (
+            self.catalog_root / "skills/hf-manual/SKILL.md"
+        ).read_text(encoding="utf-8")
+        uncertain_branch = "Check for an earlier uncertain write"
+        normal_branch = "If no prior write is uncertain"
+        self.assertIn(uncertain_branch, text)
+        self.assertIn(normal_branch, text)
+        self.assertLess(text.index(uncertain_branch), text.index(normal_branch))
+
+    def test_plan_supports_validation_only_tasks(self):
+        paths = [
+            "skills/hf-plan/SKILL.md",
+            "skills/hf-plan/references/task-sizing.md",
+            "skills/hf-plan/templates/plan.md",
+        ]
+        for path in paths:
+            with self.subTest(path=path):
+                text = (self.catalog_root / path).read_text(encoding="utf-8")
+                self.assertIn("validation-only", text)
+
+    def test_plan_distinguishes_existing_surfaces_from_approved_proposed_paths(self):
+        text = (
+            self.catalog_root / "skills/hf-plan/references/task-sizing.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Observed existing surfaces", text)
+        self.assertIn("Approved proposed paths", text)
+
+    def test_markdown_issue_skill_has_read_only_branch_and_evidence(self):
+        text = (
+            self.catalog_root / "skills/hf-issues-markdown/SKILL.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("For a read-only request", text)
+        self.assertIn("`changed: false`", text)
+
+    def test_markdown_issue_updates_require_atomic_conflict_guards(self):
+        text = (
+            self.catalog_root / "skills/hf-issues-markdown/references/update-rules.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("no-clobber", text)
+        self.assertIn("conditional replacement", text)
+        self.assertIn(
+            "block the write when either guarantee is unavailable", text.lower()
+        )
+
     def test_example_validates_when_selected_behavior_evidence_is_verified(self):
         profile = load_json(ROOT / "examples/github-issue/profile.json")
         workflow = load_json(ROOT / "examples/github-issue/workflow.json")
