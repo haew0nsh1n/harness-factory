@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -321,15 +322,24 @@ class ContractTests(FixtureCase):
     def test_skill_edit_invalidates_behavior_evidence(self):
         entry = self.root / "skills/worker/SKILL.md"
         entry.write_text(entry.read_text() + "\nChanged behavior after approval.\n")
-        with self.assertRaisesRegex(ValidationError, "evidence.*hash"):
+        with self.assertRaisesRegex(ValidationError, "bundle|evidence"):
+            self.check()
+
+    def test_reference_change_invalidates_behavior_evidence(self):
+        reference = self.root / "skills/worker/references/guide.md"
+        reference.parent.mkdir()
+        reference.write_text("changed")
+        with self.assertRaisesRegex(ValidationError, "bundle|evidence"):
             self.check()
 
     def test_selected_evidence_requires_correct_hash_and_passing_cases(self):
+        self.check()
         original = copy.deepcopy(self.evidence)
         for field, value in [
-            ("schema_version", True), ("runtime", "other-host"),
-            ("skills", {}), ("skills", {"worker": "0" * 64}),
-            ("skills", {"worker": "not-a-hash"}),
+            ("schema_version", True), ("schema_version", 1),
+            ("runtime", "other-host"),
+            ("bundles", {}), ("bundles", {"worker": "0" * 64}),
+            ("bundles", {"worker": "not-a-hash"}),
             ("cases", []), ("cases", [{"pass": False}]),
             ("cases", [{"pass": 1}]), ("cases", [{}]), ("cases", "passed"),
         ]:
@@ -339,10 +349,54 @@ class ContractTests(FixtureCase):
             with self.subTest(field=field, value=value), self.assertRaisesRegex(ValidationError, "evidence"):
                 self.check()
 
-    def test_evidence_prose_metadata_is_optional(self):
-        evidence = {key: self.evidence[key] for key in ("schema_version", "runtime", "skills", "cases")}
+        for field in original:
+            evidence = copy.deepcopy(original)
+            del evidence[field]
+            (self.root / "evidence.json").write_text(json.dumps(evidence))
+            with self.subTest(missing=field), self.assertRaisesRegex(ValidationError, "evidence"):
+                self.check()
+
+        evidence = copy.deepcopy(original)
+        evidence["method"] = "Read-only synthetic agent evaluation"
         (self.root / "evidence.json").write_text(json.dumps(evidence))
         self.check()
+
+    def test_legacy_v1_evidence_accepts_skill_md_only(self):
+        worker = self.root / "skills/worker"
+        (worker / "bundle.json").unlink()
+        markdown = self.root / "skills/hf-issues-markdown"
+        (markdown / "bundle.json").unlink()
+        evidence = {
+            "schema_version": 1,
+            "runtime": "copilot-cli",
+            "skills": {
+                "worker": hashlib.sha256((worker / "SKILL.md").read_bytes()).hexdigest(),
+                "hf-issues-markdown": hashlib.sha256(
+                    (markdown / "SKILL.md").read_bytes()
+                ).hexdigest(),
+            },
+            "cases": [{"id": "legacy-safe", "pass": True}],
+        }
+        (self.root / "evidence.json").write_text(json.dumps(evidence))
+
+        self.check()
+
+    def test_legacy_v1_evidence_rejects_bundle_manifest(self):
+        evidence = {
+            "schema_version": 1,
+            "runtime": "copilot-cli",
+            "skills": {
+                skill["id"]: hashlib.sha256(
+                    (self.root / skill["path"] / "SKILL.md").read_bytes()
+                ).hexdigest()
+                for skill in self.catalog["skills"]
+            },
+            "cases": [{"id": "legacy-safe", "pass": True}],
+        }
+        (self.root / "evidence.json").write_text(json.dumps(evidence))
+
+        with self.assertRaisesRegex(ValidationError, "evidence.*schema v2|bundle"):
+            self.check()
 
     def test_optional_after_approval_only_for_gated_read_or_local_steps(self):
         step = self.workflow["steps"][0]
@@ -389,7 +443,9 @@ class ContractTests(FixtureCase):
             with self.subTest(link=link), self.assertRaisesRegex(ValidationError, "reference"):
                 self.check()
         (self.root / "skills/worker/linked.md").symlink_to(self.root / "license.txt")
-        self.write_skill_body("[Resource](linked.md)\n")
+        (self.root / "skills/worker/SKILL.md").write_text(
+            "---\nname: worker\ndescription: Work carefully.\n---\n[Resource](linked.md)\n"
+        )
         with self.assertRaisesRegex(ValidationError, "symlink"):
             self.check()
 

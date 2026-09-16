@@ -1,9 +1,10 @@
+import hashlib
 import json
 import re
 import subprocess
 import sys
 from unittest.mock import patch
-from fixtures import FixtureCase
+from fixtures import FixtureCase, write_bundle_manifest
 from harness_factory.errors import HarnessError
 
 from harness_factory.package import generate_package, check_package
@@ -15,6 +16,25 @@ class PackageCase(FixtureCase):
         return generate_package(
             self.profile, self.workflow, self.scenarios, self.catalog, self.root, self.package
         )
+
+    def add_manifested_worker_resource(self, relative):
+        resource = self.root / "skills/worker" / relative
+        resource.parent.mkdir(parents=True, exist_ok=True)
+        resource.write_bytes(b"cache")
+        manifest_path = self.root / "skills/worker/bundle.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["resources"][relative] = hashlib.sha256(b"cache").hexdigest()
+        payload = {
+            "schema_version": 2,
+            "skill_id": "worker",
+            "resources": manifest["resources"],
+        }
+        manifest["digest"] = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        manifest_path.write_text(json.dumps(manifest))
+        self.evidence["bundles"]["worker"] = manifest["digest"]
+        (self.root / "evidence.json").write_text(json.dumps(self.evidence))
 
 
 class PackageTests(PackageCase):
@@ -52,6 +72,36 @@ class PackageTests(PackageCase):
         with self.assertRaisesRegex(HarnessError, "hash|changed"):
             check_package(self.package)
 
+    def test_generated_package_rejects_tampered_skill_reference(self):
+        source = self.root / "skills/worker"
+        (source / "references").mkdir()
+        (source / "references/guide.md").write_text("Fixture guide.\n")
+        bundle = write_bundle_manifest(source, "worker")
+        self.evidence["bundles"]["worker"] = bundle["digest"]
+        (self.root / "evidence.json").write_text(json.dumps(self.evidence))
+        self.generate()
+        reference = self.package / ".agents/skills/worker/references/guide.md"
+        reference.write_text(reference.read_text() + "\ntampered")
+        with self.assertRaisesRegex(HarnessError, "hash|changed"):
+            check_package(self.package)
+
+    def test_generated_package_provenance_includes_bundle_identity(self):
+        self.generate()
+        provenance = json.loads(
+            (self.package / ".harness/provenance.json").read_text()
+        )["skills"]
+        expected = {
+            skill["id"]: json.loads(
+                (self.root / skill["path"] / "bundle.json").read_text()
+            )["digest"]
+            for skill in self.catalog["skills"]
+        }
+
+        self.assertEqual(
+            {row["id"]: row["bundle_digest"] for row in provenance},
+            expected,
+        )
+
     def test_existing_output_refused(self):
         self.generate()
         with self.assertRaises(HarnessError):
@@ -82,6 +132,20 @@ class PackageTests(PackageCase):
             self.generate()
         self.assertFalse(self.package.exists())
 
+    def test_pycache_directory_rejected_before_generation(self):
+        self.add_manifested_worker_resource("__pycache__/note.txt")
+
+        with self.assertRaisesRegex(HarnessError, "invalid cache resource"):
+            self.generate()
+        self.assertFalse(self.package.exists())
+
+    def test_pyc_file_rejected_before_generation(self):
+        self.add_manifested_worker_resource("compiled.pyc")
+
+        with self.assertRaisesRegex(HarnessError, "invalid cache resource"):
+            self.generate()
+        self.assertFalse(self.package.exists())
+
     def test_malformed_manifest_and_workflow_return_domain_errors(self):
         from harness_factory.package import hash_bytes, json_bytes
         self.generate()
@@ -105,6 +169,18 @@ class PackageTests(PackageCase):
         manifest_path = self.package / ".harness/manifest.json"
         manifest = json.loads(manifest_path.read_text())
         del manifest["files"]["harness_factory/tracker.py"]
+        manifest_path.write_bytes(json_bytes(manifest))
+        with self.assertRaisesRegex(HarnessError, "required files"):
+            check_package(self.package)
+
+    def test_skill_bundle_runtime_module_is_required(self):
+        from harness_factory.package import json_bytes
+        self.generate()
+        skill_bundle = self.package / "harness_factory/skill_bundle.py"
+        skill_bundle.unlink()
+        manifest_path = self.package / ".harness/manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        del manifest["files"]["harness_factory/skill_bundle.py"]
         manifest_path.write_bytes(json_bytes(manifest))
         with self.assertRaisesRegex(HarnessError, "required files"):
             check_package(self.package)
@@ -253,6 +329,9 @@ class PackageTests(PackageCase):
         references = self.root / "skills/worker/references"
         references.mkdir()
         (references / "guide.md").write_text("Required bundled guide\n")
+        bundle = write_bundle_manifest(self.root / "skills/worker", "worker")
+        self.evidence["bundles"]["worker"] = bundle["digest"]
+        (self.root / "evidence.json").write_text(json.dumps(self.evidence))
         self.generate()
         relative = ".agents/skills/worker/references/guide.md"
         (self.package / relative).unlink()
@@ -260,5 +339,5 @@ class PackageTests(PackageCase):
         manifest = json.loads(manifest_path.read_text())
         del manifest["files"][relative]
         manifest_path.write_bytes(json_bytes(manifest))
-        with self.assertRaisesRegex(HarnessError, "reference"):
+        with self.assertRaisesRegex(HarnessError, "reference|bundle|resource"):
             check_package(self.package)

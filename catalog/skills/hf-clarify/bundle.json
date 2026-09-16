@@ -1,0 +1,10 @@
+{
+  "digest": "a771b1b913fe59f93d7aef383fb9a1bdff96660a15abe01d43da98c3e9add487",
+  "resources": {
+    "SKILL.md": "8743be498323b0ddeaa67cb500a165adfee014ffcecd454d5b6eb3b9b5971fad",
+    "references/decision-tree.md": "6d8bbfe273732e7a3bb6643531f0fc2551a1a1a0c344b3042e33c3a77bbd0e56",
+    "templates/brief.md": "7b6a7dd486d288900551c4f747245236ac2d61ee8c35815b341d760b2468f68a"
+  },
+  "schema_version": 2,
+  "skill_id": "hf-clarify"
+}

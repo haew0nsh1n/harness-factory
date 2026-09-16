@@ -1,9 +1,22 @@
 import shutil
 import uuid
-import hashlib
 import json
 from pathlib import Path
 from unittest import TestCase
+
+from harness_factory.skill_bundle import skill_bundle_digest, skill_resource_hashes
+
+
+def write_bundle_manifest(skill_root: Path, skill_id: str) -> dict[str, object]:
+    resources = skill_resource_hashes(skill_root)
+    manifest = {
+        "schema_version": 2,
+        "skill_id": skill_id,
+        "resources": resources,
+        "digest": skill_bundle_digest(skill_id, resources),
+    }
+    (skill_root / "bundle.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    return manifest
 
 
 class FixtureCase(TestCase):
@@ -22,18 +35,18 @@ class FixtureCase(TestCase):
             "Create one Markdown file per issue. Do not commit or push.\n"
         )
         (self.root / "license.txt").write_text("MIT\nCopyright Example\n")
+        worker_bundle = write_bundle_manifest(self.root / "skills/worker", "worker")
+        markdown_bundle = write_bundle_manifest(
+            self.root / "skills/hf-issues-markdown", "hf-issues-markdown"
+        )
         self.evidence = {
-            "schema_version": 1, "runtime": "copilot-cli", "date": "2026-09-10",
-            "method": "Read-only synthetic agent evaluation", "scope": "Bounded simulation only",
-            "skills": {
-                "worker": hashlib.sha256(
-                    (self.root / "skills/worker/SKILL.md").read_bytes()
-                ).hexdigest(),
-                "hf-issues-markdown": hashlib.sha256(
-                    (self.root / "skills/hf-issues-markdown/SKILL.md").read_bytes()
-                ).hexdigest(),
+            "schema_version": 2,
+            "runtime": "copilot-cli",
+            "bundles": {
+                "worker": worker_bundle["digest"],
+                "hf-issues-markdown": markdown_bundle["digest"],
             },
-            "cases": [{"id": "normal", "status": "completed", "observed": "Expected synthetic handoff", "pass": True}],
+            "cases": [{"id": "safe", "pass": True}],
         }
         (self.root / "evidence.json").write_text(json.dumps(self.evidence))
         self.profile = {
@@ -161,5 +174,6 @@ class FixtureCase(TestCase):
     def write_skill_body(self, body):
         path = self.root / "skills/worker/SKILL.md"
         path.write_text("---\nname: worker\ndescription: Work carefully.\n---\n" + body)
-        self.evidence["skills"]["worker"] = hashlib.sha256(path.read_bytes()).hexdigest()
+        bundle = write_bundle_manifest(path.parent, "worker")
+        self.evidence["bundles"]["worker"] = bundle["digest"]
         (self.root / "evidence.json").write_text(json.dumps(self.evidence))

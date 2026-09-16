@@ -1,0 +1,10 @@
+{
+  "digest": "1186e44b843150ce5a189337cec34e31daec797f37f1311dcefcf270eec84126",
+  "resources": {
+    "SKILL.md": "eb5fb573525395687bf7007b9bf4cb796dfb671b4b38a031f17b85349c78f1cd",
+    "references/task-sizing.md": "aed7519b193b176165f3f361391b893b2567c47b91f063241b38097d2c33b0fc",
+    "templates/plan.md": "7a3d09d688ff095cbc0ca6c5c7e9458a174a1f5df054133d53e544b3d2c64339"
+  },
+  "schema_version": 2,
+  "skill_id": "hf-plan"
+}

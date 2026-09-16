@@ -1,0 +1,10 @@
+{
+  "digest": "83ee9b364e8af028549f3903b338cfd8ae63aad9955ee9fea300b78f26a68cbf",
+  "resources": {
+    "SKILL.md": "2fa64b5e1cab81ddbb439e67a861f9cd89f06a42afdf236422cf5f49e31fe850",
+    "references/uncertain-writes.md": "fbf4d672c8fc7dbcc39f5a31e67a5b85656237cea82cc0ef3f043de2917ea16c",
+    "templates/handoff.md": "6fed2b58a26936416f6f55271d0251eee0e8f769d7f86b8d768abdd06477192d"
+  },
+  "schema_version": 2,
+  "skill_id": "hf-manual"
+}

@@ -2,10 +2,13 @@ import copy
 import hashlib
 import json
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 from tests.fixtures import FixtureCase
 
+from harness_factory import load_json
+from harness_factory.delivery import canonical_json_bytes
 from harness_factory.errors import EvaluationError, PackageError
 from harness_factory.evaluation import (
     delivery_check,
@@ -16,6 +19,20 @@ from harness_factory.evaluation import (
 )
 from harness_factory.install import apply_install, plan_install
 from harness_factory.package import check_package, generate_package
+from harness_factory.skill_bundle import validate_skill_bundle
+
+
+ROOT = Path(__file__).resolve().parents[1]
+REQUIRED_BEHAVIOR_CLASSES = {
+    "success",
+    "ambiguous-input",
+    "approval-refusal",
+    "missing-access",
+    "failed-check",
+    "resume",
+    "uncertain-write",
+    "instruction-injection",
+}
 
 
 class EvaluationContractTests(FixtureCase):
@@ -332,7 +349,7 @@ class EvaluationSealingTests(FixtureCase):
                         )
 
                     public_error = (
-                        "skill hash mismatch"
+                        "skill (?:bundle: resource )?hash mismatch"
                         if field == "skill"
                         else "evaluation receipt.*{}.*stale".format(field)
                     )
@@ -636,3 +653,342 @@ class DeliveryCheckTests(FixtureCase):
             with self.assertRaises(PackageError):
                 delivery_check(self.package)
         mocked.assert_not_called()
+
+
+class SkillQualityEvidenceContractTests(FixtureCase):
+    def setUp(self):
+        super().setUp()
+        self.catalog_root = ROOT / "catalog"
+        self.evidence_root = self.catalog_root / "evidence"
+        self.catalog = load_json(self.catalog_root / "catalog.json")
+
+    def test_reviewed_scenarios_cover_every_skill_and_comparison_gate(self):
+        baseline = load_json(self.evidence_root / "skill-quality-baseline.json")
+        contract = load_json(self.evidence_root / "skill-quality-scenarios.json")
+        self.assertEqual(
+            set(contract),
+            {
+                "schema_version",
+                "prompt_version",
+                "behavior_classes",
+                "comparison_policy",
+                "scenarios",
+            },
+        )
+        self.assertEqual(contract["schema_version"], 1)
+        self.assertEqual(set(contract["behavior_classes"]), REQUIRED_BEHAVIOR_CLASSES)
+        self.assertEqual(
+            contract["comparison_policy"],
+            {
+                "baseline": "skill-quality-baseline.json",
+                "required_per_skill": [
+                    "no-mandatory-regression",
+                    "at-least-one-improvement",
+                ],
+            },
+        )
+
+        catalog_skills = {skill["id"] for skill in self.catalog["skills"]}
+        baseline_cases = {case["id"] for case in baseline["cases"]}
+        scenario_ids = set()
+        kinds_by_skill = {skill: set() for skill in catalog_skills}
+        observation_kinds_by_skill = {skill: set() for skill in catalog_skills}
+        compared_baseline_cases = set()
+        observed_behavior_classes = set()
+        for scenario in contract["scenarios"]:
+            self.assertEqual(
+                set(scenario),
+                {
+                    "id",
+                    "skill",
+                    "kind",
+                    "behavior_class",
+                    "given",
+                    "expected_status",
+                    "required_observations",
+                    "forbidden",
+                },
+            )
+            self.assertNotIn(scenario["id"], scenario_ids)
+            scenario_ids.add(scenario["id"])
+            self.assertIn(scenario["skill"], catalog_skills)
+            self.assertIn(scenario["kind"], {"positive", "adversarial"})
+            self.assertIn(scenario["behavior_class"], REQUIRED_BEHAVIOR_CLASSES)
+            self.assertIsInstance(scenario["given"], str)
+            self.assertTrue(scenario["given"].strip())
+            self.assertIn(
+                scenario["expected_status"],
+                {
+                    "awaiting-answer",
+                    "awaiting-approval",
+                    "awaiting-manual",
+                    "blocked",
+                    "cancelled",
+                    "failed",
+                    "uncertain",
+                    "completed",
+                },
+            )
+            self.assertTrue(scenario["required_observations"])
+            observation_ids = set()
+            for observation in scenario["required_observations"]:
+                self.assertEqual(
+                    set(observation),
+                    {"id", "kind", "description", "baseline_case"},
+                )
+                self.assertNotIn(observation["id"], observation_ids)
+                observation_ids.add(observation["id"])
+                self.assertIn(
+                    observation["kind"],
+                    {"acceptance", "mandatory-regression", "improvement"},
+                )
+                self.assertIsInstance(observation["description"], str)
+                self.assertTrue(observation["description"].strip())
+                baseline_case = observation["baseline_case"]
+                if observation["kind"] == "mandatory-regression":
+                    self.assertIn(baseline_case, baseline_cases)
+                    compared_baseline_cases.add(baseline_case)
+                else:
+                    self.assertIsNone(baseline_case)
+                observation_kinds_by_skill[scenario["skill"]].add(
+                    observation["kind"]
+                )
+            self.assertIsInstance(scenario["forbidden"], list)
+            self.assertEqual(len(scenario["forbidden"]), len(set(scenario["forbidden"])))
+            self.assertTrue(
+                all(isinstance(item, str) and item.strip() for item in scenario["forbidden"])
+            )
+            kinds_by_skill[scenario["skill"]].add(scenario["kind"])
+            observed_behavior_classes.add(scenario["behavior_class"])
+
+        self.assertEqual(observed_behavior_classes, REQUIRED_BEHAVIOR_CLASSES)
+        self.assertEqual(compared_baseline_cases, baseline_cases)
+        for skill in catalog_skills:
+            with self.subTest(skill=skill):
+                self.assertEqual(kinds_by_skill[skill], {"positive", "adversarial"})
+                self.assertIn(
+                    "mandatory-regression", observation_kinds_by_skill[skill]
+                )
+                self.assertIn("improvement", observation_kinds_by_skill[skill])
+
+    def test_legacy_baseline_preserves_old_skill_hashes_without_new_bundle_proof(self):
+        baseline = load_json(self.evidence_root / "skill-quality-baseline.json")
+        self.assertEqual(
+            set(baseline),
+            {
+                "schema_version",
+                "runtime",
+                "observed_at",
+                "source",
+                "source_skill_sha256",
+                "cases",
+                "refinement",
+                "limitations",
+                "current_bundle_proof",
+            },
+        )
+        self.assertEqual(baseline["schema_version"], 1)
+        self.assertEqual(baseline["runtime"], "copilot-cli")
+        self.assertEqual(baseline["observed_at"], "2026-09-10")
+        self.assertEqual(
+            baseline["source_skill_sha256"],
+            {
+                "hf-clarify": "8a1137bd11d7e27d9cb2da342955a5a9820965e7b7aff4ba70623f7691978233",
+                "hf-plan": "ac3c38a4df9d56c3086e7432b70094d7ba716839ed9ab7b4c4d2b14a67ff7c55",
+                "hf-tdd": "9d050c5af135483ff057b636c93ae147558e5989ee2205c5f35d9da314e1304b",
+                "hf-review": "bf5d036ecf8c2b87a66067de722f097752cbe24820393170fe1ffe6e826f2453",
+                "hf-manual": "87ded9a8d16dc20fe96914752ae5de17c83dfae514e608717b3f6687cd55786d",
+                "hf-issues-markdown": "41f2bf65d2ed2e38e0827d3e6f927f22fd991c2a41a250ed250ec94f3f3482d4",
+            },
+        )
+        self.assertIs(baseline["current_bundle_proof"], False)
+        expected_cases = {
+            "normal-handoff": "awaiting-manual",
+            "approval-denied": "cancelled",
+            "missing-integration": "blocked",
+            "test-command-failed": "failed",
+            "resume": "blocked",
+            "uncertain-publication": "uncertain",
+            "issue-instruction-injection": "awaiting-approval",
+            "clarify-question": "awaiting-answer",
+            "plan-ready": "awaiting-engineer-approval",
+            "review-missing-evidence": "blocked",
+            "markdown-preserve-unknown-sections": "completed",
+            "markdown-refuse-git-publication": "awaiting-manual",
+        }
+        self.assertEqual(
+            {case["id"]: case["status"] for case in baseline["cases"]},
+            expected_cases,
+        )
+        self.assertTrue(all(case["pass"] is True for case in baseline["cases"]))
+        self.assertTrue(baseline["limitations"])
+
+    def test_evaluator_inputs_embed_exact_bundles_without_expected_rubric(self):
+        contract = load_json(self.evidence_root / "skill-quality-scenarios.json")
+        scenarios_by_skill = {}
+        for scenario in contract["scenarios"]:
+            scenarios_by_skill.setdefault(scenario["skill"], []).append(scenario)
+
+        input_root = self.evidence_root / "evaluator-inputs"
+        input_paths = sorted(input_root.glob("*.json"))
+        self.assertEqual(
+            {path.stem for path in input_paths},
+            {skill["id"] for skill in self.catalog["skills"]},
+        )
+        forbidden_keys = {
+            "behavior_class",
+            "expected_status",
+            "required_observations",
+            "forbidden",
+            "reviewer_decision",
+        }
+
+        def all_keys(value):
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    yield key
+                    yield from all_keys(child)
+            elif isinstance(value, list):
+                for child in value:
+                    yield from all_keys(child)
+
+        for skill in self.catalog["skills"]:
+            skill_id = skill["id"]
+            evaluator_input = load_json(input_root / (skill_id + ".json"))
+            with self.subTest(skill=skill_id):
+                self.assertEqual(
+                    set(evaluator_input),
+                    {
+                        "schema_version",
+                        "prompt_version",
+                        "attempt_id",
+                        "skill",
+                        "bundle_digest",
+                        "instructions",
+                        "constraints",
+                        "bundle_files",
+                        "scenarios",
+                        "response_schema",
+                    },
+                )
+                self.assertEqual(evaluator_input["schema_version"], 1)
+                self.assertEqual(
+                    evaluator_input["prompt_version"], contract["prompt_version"]
+                )
+                self.assertEqual(
+                    evaluator_input["attempt_id"],
+                    "task-5-{}-attempt-1".format(skill_id),
+                )
+                self.assertEqual(evaluator_input["skill"], skill_id)
+                bundle_root = self.catalog_root / skill["path"]
+                bundle = validate_skill_bundle(bundle_root, skill_id)
+                self.assertEqual(evaluator_input["bundle_digest"], bundle["digest"])
+                actual_files = {
+                    path.relative_to(bundle_root).as_posix(): path.read_text(encoding="utf-8")
+                    for path in sorted(bundle_root.rglob("*"))
+                    if path.is_file()
+                }
+                self.assertEqual(evaluator_input["bundle_files"], actual_files)
+                self.assertFalse(forbidden_keys.intersection(all_keys(evaluator_input)))
+                expected_inputs = [
+                    {
+                        "id": scenario["id"],
+                        "scenario_sha256": hashlib.sha256(
+                            canonical_json_bytes(scenario)
+                        ).hexdigest(),
+                        "stimulus": scenario["given"],
+                    }
+                    for scenario in scenarios_by_skill[skill_id]
+                ]
+                self.assertEqual(evaluator_input["scenarios"], expected_inputs)
+                self.assertEqual(
+                    evaluator_input["response_schema"],
+                    {
+                        "type": "object",
+                        "required": ["responses"],
+                        "response_fields": ["scenario_id", "raw_response"],
+                    },
+                )
+
+    def test_sealed_skill_quality_evidence_contains_reviewed_raw_results(self):
+        contract_path = self.evidence_root / "skill-quality-scenarios.json"
+        contract = load_json(contract_path)
+        report = load_json(self.evidence_root / "copilot-behavior.json")
+        self.assertEqual(report["schema_version"], 2)
+        self.assertEqual(report["runtime"], "copilot-cli")
+        self.assertEqual(set(report["behavior_classes"]), REQUIRED_BEHAVIOR_CLASSES)
+        self.assertEqual(
+            report["scenario_contract_sha256"],
+            hashlib.sha256(contract_path.read_bytes()).hexdigest(),
+        )
+        self.assertIsInstance(report["refinement_history"], list)
+        self.assertTrue(report["limitations"])
+
+        expected_bundles = {
+            skill["id"]: validate_skill_bundle(
+                self.catalog_root / skill["path"], skill["id"]
+            )["digest"]
+            for skill in self.catalog["skills"]
+        }
+        self.assertEqual(report["bundles"], expected_bundles)
+        scenario_by_id = {scenario["id"]: scenario for scenario in contract["scenarios"]}
+        self.assertEqual(
+            {case["id"] for case in report["cases"]}, set(scenario_by_id)
+        )
+        for case in report["cases"]:
+            scenario = scenario_by_id[case["id"]]
+            with self.subTest(case=case["id"]):
+                self.assertEqual(
+                    set(case),
+                    {
+                        "id",
+                        "skill",
+                        "behavior_class",
+                        "scenario_sha256",
+                        "bundle_digest",
+                        "attempt_id",
+                        "prompt_version",
+                        "evaluator_metadata",
+                        "raw_response",
+                        "observed_status",
+                        "observed_actions",
+                        "observed_required_observations",
+                        "observed_forbidden",
+                        "reviewer_decision",
+                        "reviewed_by",
+                        "reviewed_at",
+                        "pass",
+                    },
+                )
+                self.assertEqual(case["skill"], scenario["skill"])
+                self.assertEqual(case["behavior_class"], scenario["behavior_class"])
+                self.assertEqual(
+                    case["scenario_sha256"],
+                    hashlib.sha256(canonical_json_bytes(scenario)).hexdigest(),
+                )
+                self.assertEqual(case["bundle_digest"], expected_bundles[case["skill"]])
+                self.assertEqual(case["prompt_version"], contract["prompt_version"])
+                self.assertIsInstance(case["raw_response"], str)
+                self.assertTrue(case["raw_response"].strip())
+                self.assertEqual(case["observed_status"], scenario["expected_status"])
+                self.assertIsInstance(case["observed_actions"], list)
+                required_ids = {
+                    observation["id"]
+                    for observation in scenario["required_observations"]
+                }
+                self.assertEqual(
+                    set(case["observed_required_observations"]), required_ids
+                )
+                self.assertEqual(case["observed_forbidden"], [])
+                self.assertEqual(
+                    set(case["evaluator_metadata"]),
+                    {"model", "deployment", "model_version"},
+                )
+                for value in case["evaluator_metadata"].values():
+                    self.assertTrue(value is None or (isinstance(value, str) and value))
+                self.assertEqual(case["reviewer_decision"], "accepted")
+                self.assertIsInstance(case["reviewed_by"], str)
+                self.assertTrue(case["reviewed_by"].strip())
+                self.assertIsInstance(case["reviewed_at"], str)
+                self.assertTrue(case["reviewed_at"].strip())
+                self.assertIs(case["pass"], True)

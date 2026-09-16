@@ -1,0 +1,10 @@
+{
+  "digest": "92e23d40c6751646f1b94092c9f33e5e3e0df845ebd23dcbe0a91b68a9631047",
+  "resources": {
+    "SKILL.md": "939e07fe9f6b1c81a06cabf313cab03ccaf58ce5ad38b893ddc6d4ec71aadad0",
+    "references/checklist.md": "96bd195100b3b0e2f3791c2954c9b419183bf338f785176ea4f07fb9025364e2",
+    "templates/review-report.md": "6100973a878d11f9f998961fd9e149d3cc49e19e957103d1c3f0b1d56c1fd760"
+  },
+  "schema_version": 2,
+  "skill_id": "hf-review"
+}

@@ -5,28 +5,58 @@ description: Hand a workflow stage to an authorized human with exact prerequisit
 
 # Explicit human handoff
 
-Read the active stage's manual owner, instructions, required artifacts,
-approval gate and resume condition. Missing any of these is a blocked handoff.
-Describe the exact action, who performs it, and what result they must provide.
-Do not invent a dashboard path, command, connector or permission you have not
-verified. Do not ask for a secret or save credentials in the execution record.
+## When to use / when not to use
 
-If approval is required, wait for an explicit decision by the named role before
-the action. Denied approval cancels the action; silence is not approval.
-An approved plan is not automatically approval for a later publication step.
+Use this skill when the workflow supplies a `review-report` and the next action is
+deliberately human-only or lacks an authorized integration. Do not use it to
+perform the external write, obtain secrets, infer approval, or bypass a missing
+owner or procedure.
 
-Record awaiting-manual and stop. You may explain the procedure, but must not
-perform its external write on the human's behalf. Continue only when the human
-provides the specified result and it has been checked to the extent authorized.
-Report anything that could not be verified.
+## Required inputs and blockers
 
-If a prior action timed out or its result is unknown, record uncertain and do not
-retry. First check whether the issue, PR, deployment or other result already
-exists through an authorized read or human confirmation. A new run ID is not a
-way to evade this check. Bind the confirmation to the original operation.
+Read the active stage, `review-report`, manual owner, instructions, required
+artifacts, approval timing, and resume condition. Missing any of these blocks the
+handoff. A plan approval does not authorize a later publication. Never invent a
+dashboard path, command, connector, account, permission, or completion evidence.
 
-Output the required evidence artifact (for example a PR URL plus the human's
-confirmation). Do not mark completed based only on intent or a request sent.
+## Ordered workflow
+
+1. Check for an earlier uncertain write before preparing a normal handoff. If a
+   prior write timed out or its result is unknown, read
+   [references/uncertain-writes.md](references/uncertain-writes.md), record
+   `uncertain`, do not retry, and reconcile the original operation through an
+   authorized read or human confirmation. If the result remains unknown, stop.
+2. If reconciliation proves the original effect exists, skip the normal handoff
+   and continue only to completion-evidence validation. If it proves no effect
+   occurred, return to the applicable approval gate before another attempt.
+3. Confirm the named owner is authorized for this exact action and that required
+   inputs identify the reviewed version to act on.
+4. If approval is required before the action, wait for an explicit decision from
+   the named role. Denial records `cancelled`; silence records
+   `awaiting-approval`.
+5. Define the ordered human procedure from verified customer instructions. Name
+   each prerequisite, human action, produced value, and safe evidence to return.
+   If a step is unknown, say so and request verification instead of inventing it.
+6. If no prior write is uncertain, read
+   [templates/handoff.md](templates/handoff.md), write the normal handoff, record
+   `awaiting-manual`, and stop. Do not perform the action on the human's behalf.
+7. Resume only when the specified completion evidence is returned and checked to
+   the extent authorized. Report anything that could not be verified.
+
+## Output and resume evidence
+
+Produce the `pr-url` artifact only after the authorized human supplies the real
+PR URL and confirmation required by the stage. Bind it to the reviewed input and
+approval evidence. A request sent, intent to publish, or unverified URL is not
+completion. Until then, output the handoff state and exact resume condition
+without fabricating `pr-url`.
+
+## Forbidden claims and side effects
+
+This skill has `manual` effect: the agent performs no external write. Do not open
+browsers, run publication commands, capture or store credentials, mutate secret
+files, auto-approve, retry an uncertain write, commit, push, create a PR, deploy,
+or claim completion without verified evidence.
 
 Adapted from Matt Pocock's `wizard` at
 `3cca18b368ae95cdbdebbff572ccafa662551015`. Changes: explicit human procedure,

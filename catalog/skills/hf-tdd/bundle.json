@@ -1,0 +1,10 @@
+{
+  "digest": "d5f40c7c48e86db5426c872f54b02996c98984bb2f20e1c4a0a17805f86319ba",
+  "resources": {
+    "SKILL.md": "90e8027d2b1a4a759299187a9c9168fda003b1251f4b3b0385da93d9b5d4bffc",
+    "references/failure-classification.md": "71ee24e1595a55c533559ad086454806ca60b1cdba37f324cc998a91f2fd770a",
+    "templates/test-results.md": "045c2dcb9c60635b3630cb305836790c109bd0d00a803d92a148c3485339c133"
+  },
+  "schema_version": 2,
+  "skill_id": "hf-tdd"
+}

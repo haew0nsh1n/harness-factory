@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "references": [
+    {
+      "id": "superpowers-writing-plans",
+      "capabilities": [
+        "implementation-planning",
+        "task-decomposition",
+        "test-first-planning",
+        "artifact-contracts"
+      ],
+      "source": {
+        "url": "https://github.com/obra/superpowers",
+        "revision": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
+        "path": "skills/writing-plans/SKILL.md",
+        "license": "MIT"
+      },
+      "snapshot": "superpowers-writing-plans.md",
+      "sha256": "0b390f72e58b6dae6022cf00981b284ebf2134b72b4e83152465c5c0cbae9be1",
+      "license_file": "licenses/superpowers.txt",
+      "adopt": [
+        "independently testable task boundaries",
+        "exact file and interface contracts",
+        "small test-first implementation steps"
+      ],
+      "exclude": [
+        "skill invocation and subagent requirements",
+        "fixed plan paths and automatic commits",
+        "host-specific worktree and handoff commands"
+      ],
+      "review_status": "reviewed"
+    },
+    {
+      "id": "superpowers-test-driven-development",
+      "capabilities": [
+        "test-driven-development",
+        "red-green-refactor",
+        "verification"
+      ],
+      "source": {
+        "url": "https://github.com/obra/superpowers",
+        "revision": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
+        "path": "skills/test-driven-development/SKILL.md",
+        "license": "MIT"
+      },
+      "snapshot": "superpowers-test-driven-development.md",
+      "sha256": "59a7070a01e1437857f1a6f3b404cd60b8ba1e602b3d0cbf8eb6746e91fd3593",
+      "license_file": "licenses/superpowers.txt",
+      "adopt": [
+        "observed failing test before implementation",
+        "minimal implementation to reach green",
+        "refactoring only with passing tests"
+      ],
+      "exclude": [
+        "deletion of pre-existing customer work",
+        "universal host trigger rules",
+        "automatic Git or publication behavior"
+      ],
+      "review_status": "reviewed"
+    },
+    {
+      "id": "mattpocock-grilling",
+      "capabilities": [
+        "requirements-clarification",
+        "dependency-aware-questioning",
+        "human-approval"
+      ],
+      "source": {
+        "url": "https://github.com/mattpocock/skills",
+        "revision": "3cca18b368ae95cdbdebbff572ccafa662551015",
+        "path": "skills/productivity/grilling/SKILL.md",
+        "license": "MIT"
+      },
+      "snapshot": "mattpocock-grilling.md",
+      "sha256": "611ed509c7fb69d96e268b8a046947c8c50378db66b2fa12d4307020204ff94f",
+      "license_file": "licenses/mattpocock.txt",
+      "adopt": [
+        "prerequisite-aware decision ordering",
+        "local fact discovery",
+        "shared understanding before action"
+      ],
+      "exclude": [
+        "multi-question rounds",
+        "automatic subagent dispatch",
+        "cross-customer discovery"
+      ],
+      "review_status": "reviewed"
+    },
+    {
+      "id": "mattpocock-wizard",
+      "capabilities": [
+        "manual-handoff",
+        "procedure-scoping",
+        "human-approval",
+        "resume-evidence"
+      ],
+      "source": {
+        "url": "https://github.com/mattpocock/skills",
+        "revision": "3cca18b368ae95cdbdebbff572ccafa662551015",
+        "path": "skills/engineering/wizard/SKILL.md",
+        "license": "MIT"
+      },
+      "snapshot": "mattpocock-wizard.md",
+      "sha256": "b550beb724a61c0595a66111e847ad166170c666593ee29b3bac8d32b38d0fce",
+      "license_file": "licenses/mattpocock.txt",
+      "adopt": [
+        "ordered manual stages",
+        "concrete human instructions",
+        "explicit confirmation and resume evidence"
+      ],
+      "exclude": [
+        "bash wizard and executable templates",
+        "secret capture and environment mutation",
+        "browser opening and GitHub writes"
+      ],
+      "review_status": "reviewed"
+    },
+    {
+      "id": "gstack-review",
+      "capabilities": [
+        "code-review",
+        "intent-review",
+        "correctness-review",
+        "evidence-based-findings",
+        "trust-boundary-review"
+      ],
+      "source": {
+        "url": "https://github.com/garrytan/gstack",
+        "revision": "71f6048e8ada25180e61438abc1d98cb151fe9a7",
+        "path": "review/SKILL.md",
+        "license": "MIT"
+      },
+      "snapshot": "gstack-review.md",
+      "sha256": "bd448d7e4a74e38672a06ef75e8d48ea5d3f7399d8b5d8339a5d1f99031bbeae",
+      "license_file": "licenses/gstack.txt",
+      "adopt": [
+        "intent and scope comparison",
+        "correctness and trust-boundary review",
+        "evidence-backed findings"
+      ],
+      "exclude": [
+        "bootstrap telemetry and auto-update resources",
+        "external review browser and web services",
+        "agent dispatch automatic fixes and publication"
+      ],
+      "review_status": "reviewed"
+    }
+  ]
+}
