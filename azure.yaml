@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+name: harness-factory
+metadata:
+  template: harness-factory-aca@1.0.0
+
+# api and worker share the same image (web/api/Dockerfile) but run different
+# commands; they are deployed as two separate Container Apps.
+services:
+  api:
+    project: .
+    language: python
+    host: containerapp
+    docker:
+      path: web/api/Dockerfile
+      context: .
+      remoteBuild: true
+  worker:
+    project: .
+    language: python
+    host: containerapp
+    docker:
+      path: web/api/Dockerfile
+      context: .
+      remoteBuild: true
+  portal:
+    project: web/portal
+    language: js
+    host: containerapp
+    docker:
+      path: Dockerfile
+      context: .
+      remoteBuild: true

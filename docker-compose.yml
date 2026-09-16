@@ -12,8 +12,12 @@ services:
       retries: 12
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    # Loopback-only publish for local DB tools; DB stays off the public frontend network.
+    ports:
+      - "127.0.0.1:5432:5432"
     networks:
       - backend
+      - dbaccess
 
   api:
     image: harness-factory-web-api:local
@@ -132,3 +136,4 @@ networks:
   backend:
     internal: true
   frontend:
+  dbaccess:

@@ -8,9 +8,11 @@ web/portal/node_modules/
 .DS_Store
 artifacts-download/
 uv-mirror.lock
+web/portal/Dockerfile.mirror
 
 # azd
 .azure/
+infra/main.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
