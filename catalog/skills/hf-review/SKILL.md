@@ -5,28 +5,53 @@ description: Review implementation against its approved intent and observed test
 
 # Review before handoff
 
-Read the approved brief/plan, implementation diff and test-results artifact.
-Identify the comparison base explicitly; do not fetch or change branches without
-authorization. If inputs or the comparison base are missing, stop and name them.
+## When to use / when not to use
 
-Review in two passes:
+Use this skill when the workflow supplies `implementation` and `test-results`
+artifacts for review before acceptance or publication. Do not use it to repair
+the implementation, create missing test evidence, approve a merge, or publish.
 
-1. Intent: required behavior, exclusions, acceptance criteria, missing or
-   unrelated changes.
-2. Correctness: concrete defects, failure paths, state/enum coverage, data
-   handling and trust boundaries. Follow relevant unchanged callers when needed.
+## Required inputs and blockers
 
-For each finding report severity, file and line, motivating code, consequence,
-confidence and the smallest useful corrective action. Suppress unsupported
-speculation. Distinguish observed defects from unverified questions.
+Read the approved brief and plan linked by the supplied artifacts, the complete
+implementation diff, the `test-results`, customer policy, and an explicit
+comparison base. Do not fetch or change branches without authorization. Missing
+inputs, a stale or ambiguous comparison base, or absent test evidence blocks a
+clean handoff; a completion note is not test evidence.
 
-Output a review-report artifact with intent match, findings, test evidence
-actually supplied, unresolved checks and a handoff recommendation. Important
-unresolved defects block acceptance. A missing test report is not "tests passed."
-Review completion alone is not approval to merge, publish a PR, or deploy.
+## Ordered workflow
 
-This is a read-only review discipline: no automatic fixes, commits, external
-review services, browser cookies, telemetry or customer data in web searches.
+1. Confirm all artifacts refer to the same approved scope and identify unrelated
+   or missing changes.
+2. Perform the intent pass: compare required behavior, exclusions, acceptance
+   criteria, and planned handoffs with the actual diff.
+3. Read [references/checklist.md](references/checklist.md) for the correctness
+   pass. Follow relevant unchanged callers and check failure paths, data safety,
+   concurrency, trust boundaries, and complete enum/state handling.
+4. For each candidate finding, identify the exact motivating code, reachable
+   consequence, severity, and confidence. Suppress style preferences,
+   unsupported speculation, and issues already prevented by surrounding code.
+5. Distinguish verified defects from questions requiring additional evidence.
+   Important unresolved defects block acceptance; missing tests never become a
+   claim that tests passed.
+6. Read [templates/review-report.md](templates/review-report.md) only when writing
+   the local `review-report` artifact and provide a concrete handoff
+   recommendation.
+
+## Output and resume evidence
+
+Produce `review-report` with intent match, evidence-grounded findings, supplied
+test evidence, checks not performed, unresolved questions, and recommendation.
+Resume a blocked review only when the missing artifact, comparison base, or
+authorized evidence is available. A clean report means no supported finding was
+found in reviewed scope; it is not customer acceptance or publication approval.
+
+## Forbidden claims and side effects
+
+This skill uses `read` plus `local` effect only for the report. Do not modify
+implementation files, auto-fix findings, fetch or change branches, commit, merge,
+publish a PR, deploy, use external review services, send customer data to web
+search, access browser cookies, or emit telemetry.
 
 Adapted from gstack `review` at
 `71f6048e8ada25180e61438abc1d98cb151fe9a7`. Changes: concise local intent/correctness

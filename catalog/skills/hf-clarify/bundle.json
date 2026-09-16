@@ -1,7 +1,9 @@
 {
-  "digest": "77fc1a3ff1e1aef9464822af6932d4f77b13c04965a777145e7915e5da0e2ca3",
+  "digest": "4aea44a00d3d9b061d102efa9fe61438766ee1ca31a75283501e8c6817f444ab",
   "resources": {
-    "SKILL.md": "8a1137bd11d7e27d9cb2da342955a5a9820965e7b7aff4ba70623f7691978233"
+    "SKILL.md": "7954a4b5f0c332eda87449abcf7052add1b60b81db222e3e229239a81ab6291e",
+    "references/decision-tree.md": "cf91c9742f11bc4eac25595224f66095c0ac9934710b162779d184b7e46e5f01",
+    "templates/brief.md": "7b6a7dd486d288900551c4f747245236ac2d61ee8c35815b341d760b2468f68a"
   },
   "schema_version": 2,
   "skill_id": "hf-clarify"

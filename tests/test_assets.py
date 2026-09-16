@@ -137,6 +137,29 @@ class AssetTests(unittest.TestCase):
                 self.assertIn(path.suffix, {".json", ".md", ".txt"})
                 self.assertEqual(path.stat().st_mode & 0o111, 0)
 
+    def test_actual_skills_have_progressive_disclosure_resources(self):
+        required = {
+            "hf-clarify": ["references/decision-tree.md", "templates/brief.md"],
+            "hf-plan": ["references/task-sizing.md", "templates/plan.md"],
+            "hf-tdd": [
+                "references/failure-classification.md",
+                "templates/test-results.md",
+            ],
+            "hf-review": ["references/checklist.md", "templates/review-report.md"],
+            "hf-manual": ["references/uncertain-writes.md", "templates/handoff.md"],
+            "hf-issues-markdown": [
+                "references/update-rules.md",
+                "templates/issue.md",
+            ],
+        }
+        for skill_id, resources in required.items():
+            root = self.catalog_root / "skills" / skill_id
+            entry = (root / "SKILL.md").read_text(encoding="utf-8")
+            for resource in resources:
+                self.assertTrue((root / resource).is_file())
+                self.assertIn(resource, entry)
+            validate_skill_bundle(root, skill_id)
+
     def test_example_validates_when_selected_behavior_evidence_is_verified(self):
         profile = load_json(ROOT / "examples/github-issue/profile.json")
         workflow = load_json(ROOT / "examples/github-issue/workflow.json")

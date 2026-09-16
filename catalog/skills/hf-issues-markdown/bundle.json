@@ -1,7 +1,9 @@
 {
-  "digest": "f8094bab0ef8d3e3a694347aa8fef3bb6c0d327bf1fcb62f54afe90b931f89a2",
+  "digest": "6183b0f24a39386e57493d478f480b916ed0dcd1fc9a68d3c5d65e9b4bd8d6c4",
   "resources": {
-    "SKILL.md": "41f2bf65d2ed2e38e0827d3e6f927f22fd991c2a41a250ed250ec94f3f3482d4"
+    "SKILL.md": "0ee20c250beabe90b224fb90e541097c3488f31b5a448dbba4af31963cd0b477",
+    "references/update-rules.md": "cbfc9dcb388378675babcd7556836277797b726df90193f231b46549128e0f01",
+    "templates/issue.md": "149d53cc11b0fb2ee6e069ac220b05e99170939bacd5d165bf4a502c986efb2c"
   },
   "schema_version": 2,
   "skill_id": "hf-issues-markdown"
