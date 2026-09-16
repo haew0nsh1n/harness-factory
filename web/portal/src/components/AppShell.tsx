@@ -18,22 +18,34 @@ export async function AppShell({ children }: AppShellProps) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <h1>Harness Factory</h1>
-        <nav aria-label="Primary">
-          <a href="/">Dashboard</a>
-          <a href="/studio">Harness Studio</a>
-          <a href="/registry">Asset Registry</a>
+        <div className="brand-block">
+          <a className="brand-mark" href="/" aria-label="Harness Factory 홈">
+            HF
+          </a>
+          <div>
+            <p className="brand-name">Harness Factory</p>
+            <p className="brand-description">워크플로 설계 스튜디오</p>
+          </div>
+        </div>
+        <nav aria-label="주요 메뉴">
+          <a href="/">대시보드</a>
+          <a href="/studio">스튜디오</a>
+          <a href="/registry">레지스트리</a>
         </nav>
-        {authState.mode === "development" ? (
-          <p className="banner" role="status">
-            Development identity
-          </p>
-        ) : (
-          <form action={signOutAction}>
-            <p className="muted">{authState.viewerLabel}</p>
-            <button type="submit">Sign out</button>
-          </form>
-        )}
+        <div className="sidebar-footer">
+          {authState.mode === "development" ? (
+            <p className="environment-note" role="status">
+              개발 환경 ID 사용 중
+            </p>
+          ) : (
+            <form action={signOutAction} className="session-block">
+              <p>{authState.viewerLabel}</p>
+              <button className="button-secondary button-compact" type="submit">
+                로그아웃
+              </button>
+            </form>
+          )}
+        </div>
       </aside>
       <main className="main-content">{children}</main>
     </div>

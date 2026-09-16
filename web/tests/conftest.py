@@ -13,6 +13,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 from web.api.config import Settings
 from web.api.main import create_app
+from web.api.db import Base
+from web.api.organizations.models import Organization
 
 
 @pytest.fixture
@@ -25,6 +27,38 @@ def development_client() -> Iterator[TestClient]:
     )
     with TestClient(app) as client:
         yield client
+
+
+@pytest.fixture
+def interview_client_factory():
+    clients: list[TestClient] = []
+
+    def build(model):
+        app = create_app(
+            Settings(
+                auth_mode="development",
+                allow_insecure_development_auth=True,
+                database_url="sqlite+pysqlite:///:memory:",
+            ),
+            interview_model_factory=lambda settings: model,
+        )
+        Base.metadata.create_all(app.state.engine)
+        with app.state.session_factory.begin() as session:
+            session.add(
+                Organization(
+                    id="org-acme",
+                    entra_tenant_id="tenant-acme",
+                    name="Acme",
+                )
+            )
+        client = TestClient(app)
+        clients.append(client)
+        return client, app
+
+    yield build
+
+    for client in clients:
+        client.close()
 
 
 @pytest.fixture

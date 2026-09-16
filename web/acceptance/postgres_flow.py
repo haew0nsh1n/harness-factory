@@ -191,12 +191,14 @@ def run_flow(
     examples_root: Path | None = None,
     transport=None,
     on_build_poll=None,
+    require_postgres: bool = True,
 ) -> dict[str, object]:
-    _expect(
-        settings.database_url.startswith("postgresql"),
-        "acceptance requires a PostgreSQL HF_DATABASE_URL, "
-        f"got {settings.database_url.split('://', 1)[0]}",
-    )
+    if require_postgres:
+        _expect(
+            settings.database_url.startswith("postgresql"),
+            "acceptance requires a PostgreSQL HF_DATABASE_URL, "
+            f"got {settings.database_url.split('://', 1)[0]}",
+        )
     suffix = uuid4().hex[:8]
     organization_id = settings.development_organization_id
     subject_id = settings.development_subject_id
@@ -426,13 +428,19 @@ def run_flow(
 
     return {
         "ok": True,
-        "database": "postgresql",
+        "database": (
+            "postgresql"
+            if settings.database_url.startswith("postgresql")
+            else "sqlite"
+        ),
+        "organization_id": organization_id,
         "design_id": design["id"],
         "design_digest": design["digest"],
         "build_id": build["id"],
         "artifact_sha256": build["artifact_digest"],
         "asset_slug": slug,
         "version_id": version["id"],
+        "version": version["version"],
         "version_digest": version["digest"],
         "channel": published["channel"],
     }

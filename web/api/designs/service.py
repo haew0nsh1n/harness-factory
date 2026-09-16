@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from hmac import compare_digest
 
-from harness_factory import load_json, validate, validate_scenarios
+from harness_factory import validate, validate_scenarios
 from harness_factory.errors import EvaluationError, ValidationError
 
 from web.api.audit.service import AuditService
@@ -14,8 +14,9 @@ from web.api.designs.models import (
     DESIGN_STATUS_VALIDATED,
     HarnessDesign,
 )
-from web.api.designs.repository import HarnessDesignRepository
+from web.api.designs.repository import HarnessDesignRepository, StaleDraftDigest
 from web.api.designs.schemas import HarnessDesignRequest
+from web.api.interviews.catalog import AuthoritativeCatalogService
 
 
 @dataclass(frozen=True)
@@ -65,7 +66,12 @@ class DesignService:
         design_id: str,
         request: HarnessDesignRequest,
     ):
-        return self._repository.replace_draft(organization_id, design_id, request)
+        try:
+            return self._repository.replace_draft(
+                organization_id, design_id, request
+            )
+        except StaleDraftDigest:
+            raise StaleDesignDigest() from None
 
     def validate(self, organization_id: str, design_id: str):
         design = self._repository.get(organization_id, design_id)
@@ -168,7 +174,7 @@ class DesignService:
         return design
 
     def _load_authoritative_catalog(self) -> dict[str, object]:
-        return load_json(self._settings.catalog_root / "catalog.json")
+        return AuthoritativeCatalogService(self._settings.catalog_root).load()
 
     def _require_matching_catalog_snapshot(
         self,

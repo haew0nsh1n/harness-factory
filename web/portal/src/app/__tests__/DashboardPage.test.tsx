@@ -69,23 +69,31 @@ describe("DashboardPageContent", () => {
 
     render(<DashboardPageContent />);
 
-    const validatedCard = await screen.findByRole("heading", { name: "Validated" });
+    const validatedCard = await screen.findByRole("heading", { name: "검증됨" });
     expect(validatedCard).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByText("Validated")).toBeInTheDocument();
-      expect(screen.getByText("Approved")).toBeInTheDocument();
-      expect(screen.getByText("Built")).toBeInTheDocument();
-      expect(screen.getByText("Published")).toBeInTheDocument();
+      expect(screen.getByText("검증됨")).toBeInTheDocument();
+      expect(screen.getByText("승인됨")).toBeInTheDocument();
+      expect(screen.getByText("빌드 완료")).toBeInTheDocument();
+      expect(screen.getByText("게시됨")).toBeInTheDocument();
     });
     expect(within(validatedCard.closest("section") as HTMLElement).getByText("1")).toBeInTheDocument();
     expect(
-      within(screen.getByRole("heading", { name: "Approved" }).closest("section") as HTMLElement).getByText("1"),
+      within(screen.getByRole("heading", { name: "승인됨" }).closest("section") as HTMLElement).getByText("1"),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByRole("heading", { name: "Built" }).closest("section") as HTMLElement).getByText("1"),
+      within(screen.getByRole("heading", { name: "빌드 완료" }).closest("section") as HTMLElement).getByText("1"),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByRole("heading", { name: "Published" }).closest("section") as HTMLElement).getByText("2"),
+      within(
+        screen.getByRole("heading", { name: "빌드 완료" }).closest(
+          "section",
+        ) as HTMLElement,
+      ).getByText("빌드 처리 완료"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("게시 준비 완료")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("heading", { name: "게시됨" }).closest("section") as HTMLElement).getByText("2"),
     ).toBeInTheDocument();
 
     expect(fetchSpy).toHaveBeenCalledWith("/api/control-plane/designs", expect.any(Object));

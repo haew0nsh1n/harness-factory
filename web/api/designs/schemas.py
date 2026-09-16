@@ -21,12 +21,20 @@ def _normalize_timestamp(value: datetime) -> datetime:
 class HarnessDesignRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    expected_digest: str | None = Field(default=None, min_length=64, max_length=64)
     customer_id: str
     name: str
     profile: dict[str, Any]
     workflow: dict[str, Any]
     scenarios: dict[str, Any]
     catalog: dict[str, Any]
+
+    @field_validator("expected_digest")
+    @classmethod
+    def validate_expected_digest(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return require_sha256_digest(value, "expected_digest")
 
 
 class ValidationFinding(BaseModel):

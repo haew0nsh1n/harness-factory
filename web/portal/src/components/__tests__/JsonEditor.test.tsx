@@ -18,13 +18,13 @@ describe("JsonEditor", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Workflow JSON"), {
+    fireEvent.change(screen.getByLabelText("워크플로 JSON"), {
       target: { value: "{not-json" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save Workflow" }));
+    fireEvent.click(screen.getByRole("button", { name: "워크플로 저장" }));
 
     expect(onSave).not.toHaveBeenCalled();
-    expect(screen.getByText(/Workflow JSON is invalid:/i)).toBeInTheDocument();
+    expect(screen.getByText(/워크플로 JSON이 올바르지 않습니다:/i)).toBeInTheDocument();
   });
 
   test("never renders password or token fields", () => {
@@ -49,11 +49,11 @@ describe("JsonEditor", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Profile JSON"), {
+    fireEvent.change(screen.getByLabelText("프로필 JSON"), {
       target: { value: "{bad-json" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "프로필 저장" }));
 
-    expect(screen.getByText(/Profile JSON is invalid:/i)).toBeInTheDocument();
+    expect(screen.getByText(/프로필 JSON이 올바르지 않습니다:/i)).toBeInTheDocument();
   });
 });

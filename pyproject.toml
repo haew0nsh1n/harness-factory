@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=75"]
+requires = ["setuptools==80.9.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -14,6 +14,9 @@ dependencies = [
   "alembic>=1.16,<1.17",
   "psycopg[binary]>=3.2,<3.3",
   "PyJWT[crypto]>=2.10,<2.11",
+  "openai>=3.8.0",
+  "azure-identity>=1.25.3",
+  "aiohttp>=3.9,<4",
 ]
 
 [project.optional-dependencies]
@@ -21,9 +24,24 @@ test = [
   "httpx>=0.28,<0.29",
   "pytest>=8.4,<8.5",
 ]
+cli = [
+  "httpx>=0.28,<0.29",
+  "keyring>=25.6,<26",
+  "msal>=1.31,<2",
+]
+
+[project.scripts]
+hf = "hf_cli.main:main"
 
 [tool.setuptools.packages.find]
-include = ["harness_factory*", "web*"]
+include = [
+  "harness_factory*",
+  "web",
+  "web.api*",
+  "web.acceptance*",
+  "hf_cli*",
+]
+exclude = ["tests*", "web.tests*", "node_modules*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "web/tests"]

@@ -78,7 +78,19 @@ def replace_design(
     actor: Actor = Depends(require_roles("author")),
     service: DesignService = Depends(get_design_service),
 ) -> dict[str, object]:
-    design = service.replace_draft(actor.organization_id, design_id, design_request)
+    try:
+        design = service.replace_draft(
+            actor.organization_id, design_id, design_request
+        )
+    except StaleDesignDigest as exc:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "ok": False,
+                "error": exc.message,
+                "code": "stale_digest",
+            },
+        )
     if design is None:
         raise HTTPException(status_code=404, detail="design not found")
     return {"ok": True, "design": to_design_response(design).model_dump(mode="json")}

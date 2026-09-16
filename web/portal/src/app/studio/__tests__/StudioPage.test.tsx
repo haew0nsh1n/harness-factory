@@ -38,10 +38,10 @@ describe("StudioPageContent", () => {
     expect(screen.getByText("Approved Design")).toBeInTheDocument();
     expect(screen.getByText("Built Design")).toBeInTheDocument();
 
-    expect(screen.getByText("Validate draft")).toBeInTheDocument();
-    expect(screen.getByText("Review digest")).toBeInTheDocument();
-    expect(screen.getByText("Queue build")).toBeInTheDocument();
-    expect(screen.getByText("Built artifact")).toBeInTheDocument();
+    expect(screen.getByText("초안 검증")).toBeInTheDocument();
+    expect(screen.getByText("다이제스트 검토")).toBeInTheDocument();
+    expect(screen.getByText("빌드 요청")).toBeInTheDocument();
+    expect(screen.getByText("빌드 결과 확인")).toBeInTheDocument();
 
     expect(fetchSpy).toHaveBeenCalledWith("/api/control-plane/designs", expect.any(Object));
   });
@@ -52,9 +52,30 @@ describe("StudioPageContent", () => {
     );
 
     render(<StudioPageContent />);
-    await screen.findByText(/no designs yet/i);
+    await screen.findByText("아직 저장된 설계가 없습니다.");
 
     expect(screen.queryByLabelText(/password|token|credential|organization/i)).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/password|token|credential|organization/i)).not.toBeInTheDocument();
+  });
+
+  test("shows a failed initial request without claiming the design list is empty", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ ok: false, error: "설계 서비스에 연결할 수 없습니다." }),
+        {
+          status: 503,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+
+    render(<StudioPageContent />);
+
+    expect(
+      await screen.findByRole("alert"),
+    ).toHaveTextContent("설계 서비스에 연결할 수 없습니다.");
+    expect(
+      screen.queryByText("아직 저장된 설계가 없습니다."),
+    ).not.toBeInTheDocument();
   });
 });

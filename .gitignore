@@ -6,6 +6,8 @@
 web/portal/.next/
 web/portal/node_modules/
 .DS_Store
+artifacts-download/
+uv-mirror.lock
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

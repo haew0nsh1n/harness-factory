@@ -20,6 +20,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from web.acceptance.distribution_flow import (
+    run_distribution_flow,
+    running_http_app,
+)
 from web.acceptance.postgres_flow import HttpResult, run_flow
 from web.api.builds.worker import BuildWorker
 from web.api.config import Settings
@@ -83,3 +87,46 @@ def test_full_lifecycle_against_postgresql(tmp_path) -> None:
     assert result["ok"] is True
     assert result["database"] == "postgresql"
     assert result["channel"] == "stable"
+
+
+def test_http_cli_distribution_against_postgresql(tmp_path, packaged_cli) -> None:
+    settings = Settings(
+        auth_mode="development",
+        allow_insecure_development_auth=True,
+        database_url=POSTGRES_URL,
+        catalog_root=FIXTURE_ROOT / "catalog",
+        artifact_root=tmp_path / "artifacts",
+    )
+    app = create_app(settings)
+    Base.metadata.create_all(app.state.engine)
+    with app.state.session_factory() as session:
+        bootstrap_development_tenant(session, settings)
+        session.commit()
+
+    worker = BuildWorker(settings)
+    try:
+        with running_http_app(app) as base_url:
+            result = run_distribution_flow(
+                settings=settings,
+                workspace=tmp_path / "distribution",
+                hf_executable=str(packaged_cli.hf),
+                python_executable=str(packaged_cli.python),
+                base_url=base_url,
+                timeout_seconds=60,
+                examples_root=FIXTURE_ROOT / "examples",
+                on_build_poll=worker.run_once,
+            )
+    finally:
+        worker.dispose()
+        app.state.engine.dispose()
+
+    assert result["database"] == "postgresql"
+    assert result["installed"] is True
+    assert result["ready"] is False
+    assert result["customer_evaluation"] == {"status": "missing"}
+    assert result["cross_tenant"] == "not_found"
+    assert result["revoked_install"] == "rejected"
+    assert Path(packaged_cli.origins["hf_cli"]).is_relative_to(packaged_cli.root)
+    assert Path(packaged_cli.origins["harness_factory"]).is_relative_to(
+        packaged_cli.root
+    )

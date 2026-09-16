@@ -19,6 +19,7 @@ def import_model_metadata() -> None:
     from web.api.builds import models as build_models
     from web.api.designs import models as design_models
     from web.api.identity import models as identity_models
+    from web.api.interviews import models as interview_models
     from web.api.organizations import models as organization_models
     from web.api.registry import models as registry_models
 
@@ -27,6 +28,7 @@ def import_model_metadata() -> None:
         build_models,
         design_models,
         identity_models,
+        interview_models,
         organization_models,
         registry_models,
     )

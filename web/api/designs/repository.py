@@ -1,7 +1,9 @@
 from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from web.api.designs.digest import design_digest
@@ -13,6 +15,11 @@ from web.api.designs.models import (
     HarnessDesign,
 )
 from web.api.designs.schemas import HarnessDesignRequest
+
+
+@dataclass(frozen=True)
+class StaleDraftDigest(Exception):
+    pass
 
 
 class HarnessDesignRepository:
@@ -70,6 +77,41 @@ class HarnessDesignRepository:
         design_id: str,
         request: HarnessDesignRequest,
     ) -> HarnessDesign | None:
+        if request.expected_digest is not None:
+            replaced = self._session.execute(
+                update(HarnessDesign)
+                .where(
+                    HarnessDesign.organization_id == organization_id,
+                    HarnessDesign.id == design_id,
+                    HarnessDesign.digest == request.expected_digest,
+                )
+                .execution_options(synchronize_session=False)
+                .values(
+                    customer_id=request.customer_id,
+                    name=request.name,
+                    profile_json=request.profile,
+                    workflow_json=request.workflow,
+                    scenarios_json=request.scenarios,
+                    catalog_json=request.catalog,
+                    validation_findings_json=None,
+                    revision=HarnessDesign.revision + 1,
+                    digest=design_digest(
+                        request.profile,
+                        request.workflow,
+                        request.scenarios,
+                        request.catalog,
+                    ),
+                    status=DESIGN_STATUS_DRAFT,
+                    updated_at=datetime.now(UTC),
+                )
+            )
+            if replaced.rowcount != 1:
+                if self.get(organization_id, design_id) is None:
+                    return None
+                raise StaleDraftDigest()
+            self._session.expire_all()
+            return self.get(organization_id, design_id)
+
         design = self.get(organization_id, design_id)
         if design is None:
             return None
@@ -90,6 +132,15 @@ class HarnessDesignRepository:
         design.status = DESIGN_STATUS_DRAFT
         self._session.flush()
         return design
+
+    def clear_approvals(self, organization_id: str, design_id: str) -> None:
+        self._session.execute(
+            delete(Approval).where(
+                Approval.organization_id == organization_id,
+                Approval.subject_type == APPROVAL_SUBJECT_TYPE_HARNESS_DESIGN,
+                Approval.subject_id == design_id,
+            )
+        )
 
     def save_validation(
         self,

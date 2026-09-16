@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getPortalAuthMode, isEntraMode } from "@/lib/auth";
 
-const ALLOWED_METHODS = new Set(["GET", "POST", "PUT"]);
+const ALLOWED_METHODS = new Set(["GET", "POST", "PUT", "DELETE"]);
 const SAFE_SEGMENT_RE = /^[A-Za-z0-9._-]+$/;
 
 function invalidResponse(status: number, code: string, error: string): NextResponse {
@@ -140,6 +140,13 @@ export async function POST(
 }
 
 export async function PUT(
+  request: NextRequest,
+  context: { params: Promise<{ path?: string[] }> },
+) {
+  return proxyRequest(request, context);
+}
+
+export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ path?: string[] }> },
 ) {

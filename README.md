@@ -10,14 +10,17 @@
           → 설치 변경 승인 → 고객 환경 사전 점검 → 고객이 실행
 ```
 
-별도 서버나 새 코딩 에이전트는 없습니다. 프로젝트 스킬은
-**`.agents/skills/`**를 사용합니다. 기존 MCP 서버·CLI를 활용하며,
-없는 연동은 사람의 작업으로 명시합니다.
+의존성 없는 standalone core는 별도 서버나 새 코딩 에이전트를 요구하지 않습니다.
+선택적인 Studio/Registry는 FastAPI, PostgreSQL, Next.js 포털과 격리 builder
+worker로 구성된 서버 애플리케이션이며, 온라인 배포용 `hf` CLI에는 별도
+`cli` extra가 필요합니다. 프로젝트 스킬은 **`.agents/skills/`**를 사용합니다.
+기존 MCP 서버·CLI를 활용하며, 없는 연동은 사람의 작업으로 명시합니다.
 
 ## 시작하기
 
-필요한 도구는 **Python 3.12 이상**과 **GitHub Copilot CLI**입니다.
-Python 외부 패키지는 필요하지 않습니다. `gh`는 GitHub 연동에만 필요하며,
+의존성 없는 `python -m harness_factory` 실행에는 **Python 3.9 이상**과
+**GitHub Copilot CLI**만 필요합니다. 웹 애플리케이션과 배포 CLI 개발 환경은
+Python 3.12 및 `uv` 잠금 파일을 사용합니다. `gh`는 GitHub 연동에만 필요하며,
 패키지 생성과 오프라인 검사에는 인증이나 네트워크가 필요하지 않습니다.
 
 이 저장소 루트에서 Copilot CLI를 시작합니다.
@@ -291,9 +294,144 @@ python3 -m harness_factory record --package . --run issue-demo \
 ## 개발 및 설계
 
 ```bash
-python3 -m unittest discover -s tests -v
-python3 -m harness_factory --help
+uv sync --frozen --no-config --extra test --extra cli
+uv run --frozen --no-config --extra test --extra cli pytest
+uv run --frozen --no-config python -m harness_factory --help
 ```
+
+저장소의 `uv.lock`은 공개 PyPI 소스와 정확한 아티팩트 해시를 사용합니다.
+`--no-config`는 사용자 또는 머신 전역 uv 설정이 이 기본 소스를 암묵적으로
+바꾸지 못하게 합니다.
+
+`hf`는 게시된 워크플로우를 찾고 검증된 패키지를 설치하기 위한 별도 CLI
+진입점입니다. 기존의 의존성 없는 `python -m harness_factory` 진입점은 그대로
+유지됩니다.
+
+개발 checkout에서는 잠긴 공개 PyPI 의존성을 그대로 사용합니다.
+
+```bash
+uv run --frozen --no-config --extra cli hf login \
+  --registry https://registry.example.test \
+  --tenant <entra-tenant-id> \
+  --client-id <public-client-application-id> \
+  --scope api://<registry-api-app-id>/registry.access
+uv run --frozen --no-config --extra cli hf search issue --json
+uv run --frozen --no-config --extra cli hf info issue-to-pr@1.0.0
+uv run --frozen --no-config --extra cli hf install issue-to-pr@1.0.0 \
+  --target ../customer-repository
+uv run --frozen --no-config --extra cli hf install issue-to-pr@1.0.0 \
+  --target ../customer-repository --approve <preview-digest>
+uv run --frozen --no-config --extra cli hf logout
+```
+
+배포 wheel은 다음처럼 만들고 checkout 밖에서 확인할 수 있습니다. 새 환경에
+`[cli]` extra를 설치하려면 HTTPS PyPI 또는 승인된 동일 버전 패키지 피드에
+접속할 수 있어야 합니다. 기업 피드를 쓸 때도 아래의 `uv.lock`을 사설 URL로
+수정하지 말고 이 문서의 `scripts/prepare_uv_lock.py` 절차를 사용합니다.
+
+```bash
+uv build --wheel
+python3.12 -m venv .harness-factory/cli-smoke
+.harness-factory/cli-smoke/bin/python -m pip install \
+  'dist/harness_factory-1.1.0-py3-none-any.whl[cli]'
+(cd .harness-factory && cli-smoke/bin/hf --help)
+```
+
+첫 번째 `hf install`은 대상을 변경하지 않고 파일 작업과 제한된 로컬 텍스트
+diff, 승인 digest를 출력합니다. `--approve` 적용 시 Registry의 게시 상태와
+delivery metadata를 다시 조회하고, 동일한 비공개 stable cache 경로와 바이트,
+변경되지 않은 대상 상태를 확인한 뒤 기존 core installer를 호출합니다. SHA-256은
+설정된 HTTPS Registry에서 받은 metadata와 다운로드 바이트를 결합하지만 독립적인
+publisher 서명은 아닙니다. 설치는 rollback transaction이 아니며 일부 파일 기록
+후 실패하면 core installer가 `partial install (no rollback; ...)`으로 보고합니다.
+성공한 설치도 evaluation 또는 환경 readiness를 의미하지 않습니다.
+
+운영 로그인에는 device code flow가 허용된 Microsoft Entra public-client 앱과
+Registry API의 delegated scope가 필요합니다. API는 토큰의 tenant/object ID를
+자체 조직 membership과 역할에 매핑해야 하며, CLI 인수의 조직이나 역할을 운영
+권한으로 사용하지 않습니다. 토큰 캐시는 macOS Keychain, Windows Credential
+Manager 또는 Linux Secret Service 같은 지원되는 네이티브 OS keyring에만
+저장됩니다. null, plaintext 또는 임의 플러그인 keyring이면 로그인은 명시적으로
+실패합니다. 이 저장소는 Entra 앱 등록, API 권한 동의, membership 생성 또는 실제
+로그인을 자동으로 수행하지 않습니다.
+
+명시적 로컬 개발 인증은 DNS 이름이 아닌 loopback IP origin에서만 사용할 수
+있습니다.
+
+```bash
+uv run --frozen --no-config --extra cli hf login \
+  --registry http://127.0.0.1:8000 --development \
+  --organization org-acme --subject developer-1 --role developer
+```
+
+Azure OpenAI 인터뷰를 로컬에서 개발할 때는 Azure CLI 로그인을 사용할 수 있도록
+API를 호스트에서 실행합니다. SDK는 `DefaultAzureCredential` 체인으로 인증하며
+API 키, Key Vault 또는 수동 credential 선택을 지원하지 않습니다.
+비동기 Azure Identity transport에 필요한 `aiohttp`는 웹 런타임의 직접
+의존성으로 잠겨 있습니다.
+
+```bash
+az login
+mkdir -p .harness-factory
+export HF_DATABASE_URL=sqlite+pysqlite:///.harness-factory/host-api.db
+export HF_AZURE_OPENAI_ENDPOINT=https://proj-aimain.cognitiveservices.azure.com/
+export HF_AZURE_OPENAI_DEPLOYMENT=gpt-5.6-sol
+# 호스팅된 관리 ID만 선택해야 할 때 선택적으로 설정:
+# export HF_AZURE_MANAGED_IDENTITY_CLIENT_ID=<managed-identity-client-id>
+export HF_AUTH_MODE=development
+export HF_ALLOW_INSECURE_DEVELOPMENT_AUTH=true
+uv run --frozen --no-config alembic upgrade head
+uv run --frozen --no-config python -m web.api.organizations.bootstrap
+uv run --frozen --no-config uvicorn web.api.main:create_app \
+  --factory --host 127.0.0.1 --port 8000
+```
+
+다른 터미널에서 포털 프록시를 같은 loopback host API로 연결합니다.
+
+```bash
+cd web/portal
+NEXT_PUBLIC_HF_AUTH_MODE=development \
+HF_API_BASE_URL=http://127.0.0.1:8000 \
+HF_DEV_ORGANIZATION=local-dev \
+HF_DEV_SUBJECT=portal-dev \
+HF_DEV_ROLES=author,reviewer,registry-admin,developer,org-admin \
+npm run dev -- --hostname 127.0.0.1 --port 3000
+```
+
+설정이 없으면 기존 authoring/registry 기능은 계속 동작하고 인터뷰 추론만
+`llm_not_configured`로 비활성화됩니다. 개발자 Azure 토큰을 환경 변수로 복사하거나
+`~/.azure`를 컨테이너에 마운트하지 마세요. Azure 호스팅에서는 관리 ID와 별도의
+inference RBAC 구성이 필요합니다.
+
+운영 Entra 웹 로그인에는 별도의 포털/API 앱 등록, delegated scope/동의,
+조직 membership 매핑이 필요합니다. 이 저장소는 앱 등록, 역할 부여, Azure
+리소스 생성 또는 inference 권한 부여를 수행하지 않습니다. 로컬 development
+identity와 Azure CLI 기반 모델 호출은 실제 운영 Entra 로그인이나 hosted
+managed identity 접근의 증거가 아닙니다.
+
+인터뷰는 명시적인 `2026-09-15` 동의 후에만 저장되고 Azure OpenAI로 전송됩니다.
+답변은 기본 30일(`HF_INTERVIEW_RETENTION_DAYS`) 동안 마지막 쓰기 활동부터
+보관되며, 만료 레코드는 다음 명령으로 정리합니다.
+
+모델이 새로 생성하는 첫 질문과 후속 질문, 근거 문장 및 설계 초안의 설명 문구는
+입력과 기존 대화가 영어여도 한국어로 작성합니다. 제품명과 인용문은 필요하면
+원문을 유지하며, 워크플로 ID·enum·capability·경로 같은 기계 판독 값은 번역하지
+않습니다. 이미 저장된 영어 대화 기록은 소급 번역하거나 변경하지 않습니다.
+
+```bash
+uv run --frozen --no-config python -m web.api.interviews.cleanup
+```
+
+인터뷰 삭제는 대화, 작업, 제안 레코드를 제거하지만 이미 생성된 design은 제거하지
+않습니다. 데이터베이스 백업 보존 기간은 이 정리 작업과 별개이며 운영자가 별도로
+관리해야 합니다. 비밀, 소스 코드, issue 본문 또는 customer connector credential을
+인터뷰에 입력하지 마세요. 인식 가능한 비밀 패턴은 저장과 모델 호출 전에 거부되지만
+임의의 민감 정보를 완벽히 탐지한다고 보장하지 않습니다.
+
+모델 경계는 답변 8,000자, 세션 60턴, 전체 모델 문맥 64,000자, draft 출력
+최대 8,192 token(현재 요청 6,144), 전체 요청 60초로 제한됩니다.
+timeout/일시 오류는 전체 deadline 안에서 최대 한 번만 재시도하며, 한도를 넘으면
+문맥을 조용히 생략하지 않습니다.
 
 ## 웹 Authoring Registry 로컬 스택
 
@@ -304,12 +442,40 @@ docker compose up --build
 open http://localhost:3000
 ```
 
-If your enterprise build environment needs a private package feed, provide it
-as an optional build override:
+Docker 이미지는 `python:3.12-slim` 안에서 `uv==0.8.3`과 격리 빌드용
+`setuptools==80.9.0`을 Python 패키지로 부트스트랩하므로 별도의 GHCR uv
+이미지에 의존하지 않습니다. 애플리케이션 의존성 설치와 환경 동기화는 계속
+uv가 수행합니다.
+
+`uv sync --frozen`은 잠금 파일에 기록된 레지스트리와 아티팩트 URL을 그대로
+사용합니다. 따라서 `PIP_INDEX_URL` 또는 `UV_INDEX_URL` 환경 변수만 설정해도
+기존 잠금 파일의 소스는 바뀌지 않습니다. 기업 패키지 피드가 필요하면 먼저
+기본 잠금 파일과 동일한 패키지 버전으로 별도 잠금 파일을 생성한 다음 그 파일을
+명시적으로 선택하세요.
 
 ```bash
-PIP_INDEX_URL=https://packagefeedproxy.microsoft.io/pypi/simple docker compose up --build
+uv --version  # must report uv 0.8.3
+python3 scripts/prepare_uv_lock.py \
+  --index-url https://packages.example.test/pypi/simple \
+  --output uv.enterprise.lock
+
+PIP_INDEX_URL=https://packages.example.test/pypi/simple \
+UV_LOCK_FILE=uv.enterprise.lock \
+docker compose up --build
 ```
+
+준비 스크립트는 저장소의 `uv.lock`을 해석 기준으로 사용하고, uv의
+`--default-index`와 `--no-config` 옵션으로 선택한 피드에서 다시 잠근 뒤 모든
+패키지 이름과 버전이 동일한지 검사합니다. 피드에 같은 버전이 없거나 접근할 수
+없으면 실패하며 다른 네트워크 소스로 자동 전환하지 않습니다. 생성된 잠금 파일은
+피드가 반환한 정확한 다운로드 URL을 포함하므로 빌드 컨텍스트 안에 두고
+`UV_LOCK_FILE`로 선택해야 합니다. `PIP_INDEX_URL`은 컨테이너에 고정된
+`uv==0.8.3` 부트스트랩에만 사용됩니다.
+
+인덱스 URL은 HTTPS이며 자격 증명, 쿼리 문자열, fragment가 없어야 합니다.
+토큰, 사용자명, 비밀번호를 URL, 잠금 파일, Docker build argument 또는 저장소
+설정에 넣지 마세요. 인증이 필요한 피드는 승인된 외부 credential provider를
+사용하세요.
 
 - `postgres`: PostgreSQL 16, named volume `postgres-data`.
   `backend` internal network에만 연결되며 호스트로 포트를 노출하지 않습니다.
@@ -373,8 +539,11 @@ docker compose exec api python -m web.api.organizations.bootstrap
 - asset/channel당 published 버전은 하나입니다. 새 버전을 publish하면 같은
   트랜잭션에서 이전 published 버전이 `deprecated`로 내려가고 이력은 유지됩니다.
 - artifact는 API/worker가 공유하는 `/artifacts` 아래 immutable key로 저장합니다.
-- CLI 배포(`hf login/search/install/upgrade`)와 설치·실행 usage telemetry는
-  후속 구현 범위이며 이번 로컬 스택 인수에 포함되지 않습니다.
+- CLI 배포는 `hf login/search/info/install/logout`을 제공합니다. `upgrade`와
+  설치·실행 usage telemetry는 아직 구현하지 않았습니다.
+- 개발 인증 인수는 loopback HTTP와 명시적 `--development`만 사용합니다. 실제
+  Entra device login, API 앱 등록/동의, tenant membership 매핑은 외부 배포
+  선행 조건이며 기본 테스트나 로컬 Compose 인수가 검증하지 않습니다.
 
 ### PostgreSQL 인수 실행
 
@@ -386,6 +555,14 @@ docker compose up --build -d
 docker compose exec api python -m web.acceptance.postgres_flow
 ```
 
+이 명령은 PostgreSQL lifecycle과 tenant 격리를 검사합니다. API/worker 이미지는
+의도적으로 웹 런타임만 포함하며 `hf_cli` 소스나 CLI extra를 포함하지 않습니다.
+따라서 wheel 기반 CLI 인수를 API 컨테이너 안에서 실행한다고 가정하지 마세요.
+HTTP `search/info/delivery`, 실제 wheel의 `hf` preview/apply, 고객 파일 보존,
+evaluation 누락 시 `installed=true`이지만 `ready=false`, cross-tenant 404와
+revoke 이후 설치 거절은 아래의 호스트 pytest가 별도 격리 CLI 환경을 준비해
+검사합니다. API/worker 이미지, volume, network에는 CLI를 추가하지 않습니다.
+
 Compose의 PostgreSQL은 internal network에만 있어 호스트에서 직접 접속할 수
 없습니다. 같은 흐름을 호스트 pytest로 돌리려면 별도 PostgreSQL을 띄우고
 `HF_POSTGRES_TEST_URL`을 지정합니다. 이 환경변수가 없으면 테스트는 skip됩니다.
@@ -395,9 +572,71 @@ docker run --rm -d --name hf-pg-acceptance \
   -e POSTGRES_DB=harness_factory -e POSTGRES_USER=hf -e POSTGRES_PASSWORD=hf \
   -p 127.0.0.1:5433:5432 postgres:16
 HF_POSTGRES_TEST_URL=postgresql+psycopg://hf:hf@127.0.0.1:5433/harness_factory \
-  .venv/bin/pytest web/tests/test_postgres_acceptance.py -q
+  uv run --frozen --no-config --extra test --extra cli \
+  pytest web/tests/test_interview_acceptance.py \
+    web/tests/test_postgres_acceptance.py -q
 docker rm -f hf-pg-acceptance
 ```
+
+호스트 PostgreSQL URL은 SQLAlchemy `postgresql+psycopg://...` 형식으로
+지정합니다. 기본 회귀 명령은 URL 없이 실행하며 인터뷰 lifecycle을 포함한
+PostgreSQL opt-in 테스트 3개와 Azure structured-output live 테스트 1개를
+명시적으로 skip합니다. 패키징 fixture는 한 세션에 wheel을 한 번만 만들고
+새 venv에 `wheel[cli]`와 선언된 의존성을 설치합니다. runner의 site-packages나
+checkout을 `.pth`로 연결하지 않으며 `hf_cli`와 `harness_factory` import 위치가
+그 venv 아래인지 확인합니다. 의존성 버전과 해시는 canonical `uv.lock`에서
+`uv export --frozen`으로 가져옵니다. 공개 PyPI 대신 승인된 피드를 명시하려면
+자격 증명 없는 HTTPS origin을, 그 잠금과 일치하는 완전한 로컬 wheelhouse가
+있으면 그 디렉터리를 지정합니다.
+두 환경변수가 없으면 credential-free 전역 pip index를 명시적으로 읽어 uv에
+전달하고, 설정된 index가 없을 때만 공개 PyPI를 사용합니다.
+
+```bash
+HF_ACCEPTANCE_INDEX_URL=https://packages.example.test/pypi/simple \
+  uv run --frozen --no-config --extra test --extra cli \
+  pytest tests/cli/test_packaging.py web/tests/test_distribution_acceptance.py -q
+
+HF_ACCEPTANCE_WHEELHOUSE=/absolute/path/to/wheelhouse \
+  uv run --frozen --no-config --extra test --extra cli \
+  pytest tests/cli/test_packaging.py web/tests/test_distribution_acceptance.py -q
+```
+
+```bash
+uv run --frozen --no-config --extra test --extra cli \
+  pytest tests/cli web/tests/test_distribution.py \
+  web/tests/test_distribution_acceptance.py -q
+uv run --frozen --no-config python -m unittest discover -s tests -v
+```
+
+### 2026-09-15 구현 검증 범위
+
+- 합성 기본 모델 인수는 consent→질문/답변→사람의 사실·범위 확인→canonical
+  draft→validate→exact-digest review→worker build→version review/publish→
+  실제 wheel `[cli]`의 HTTP search/info/preview/apply→고객 파일 보존→
+  evaluation 부재 `ready=false`까지 연결합니다.
+- 별도 opt-in Azure 인수는 실제 `DefaultAzureCredential`, Responses structured
+  output과 `store:false`로 합성 질문 1개를 생성하고, 실제 모델 candidate를
+  production proposal assembly→server-authored scope confirmation→exact-digest
+  apply→canonical design validation까지 통과시킵니다. 기본 테스트는 네트워크를
+  사용하지 않으며 live 성공을 fake 모델 성공으로 대체하지 않습니다.
+- 기본 Playwright의 `[mocked visual]` 인터뷰 테스트는 control-plane 응답을
+  가로채며 320/768/1440px 레이아웃, consent, composer, source-linked evidence,
+  proposal forms, reload와 target digest UI를 검증합니다. 실제 API/DB 성공의
+  증거로 사용하지 않습니다.
+- 별도 real integration은 브라우저→Next.js same-origin proxy→실제 FastAPI
+  production services→격리된 SQLite DB를 연결합니다. deterministic fake model로
+  proposal을 만들고 기존 design id를 유지한 채 교체하며, persisted revision/digest,
+  canonical validation과 기존 approval 삭제를 실제 DB에서 검증합니다.
+
+```bash
+cd web/portal
+npm run test:e2e:integration
+```
+- 실제 PostgreSQL 검증은 0005/0006/0007 upgrade/downgrade와 서로 다른 DB
+  연결을 사용한 CAS 경쟁을 포함합니다.
+- 미검증 범위: 실제 운영 Entra 브라우저 로그인, 앱 등록/동의, Azure-hosted
+  managed identity/RBAC, 실제 고객 입력·저장소·connector, 행동 평가 영수증,
+  실제 고객 환경 readiness.
 
 ### 2026-09-14 구현 검증 결과
 

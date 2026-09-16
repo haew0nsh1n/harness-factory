@@ -33,22 +33,22 @@ function publishedVersions(asset: RegistryAssetDetail | null): RegistryVersionSu
 
 function validationStatus(version: RegistryVersionSummary | null): string {
   if (!version) {
-    return "Unknown";
+    return "알 수 없음";
   }
   return ["validated", "approved", "published", "deprecated", "revoked"].includes(
     version.status,
   )
-    ? "Validated"
-    : "Pending";
+    ? "검증됨"
+    : "대기 중";
 }
 
 function approvalStatus(version: RegistryVersionSummary | null): string {
   if (!version) {
-    return "Unknown";
+    return "알 수 없음";
   }
   return ["approved", "published", "deprecated", "revoked"].includes(version.status)
-    ? "Approved"
-    : "Pending";
+    ? "승인됨"
+    : "대기 중";
 }
 
 function toDisplayManifest(manifest: RegistryManifest): DisplayManifest {
@@ -88,7 +88,7 @@ export function RegistryDetailPageContent({
         }
       } catch (cause) {
         if (active) {
-          setError(cause instanceof ApiError ? cause.message : "Unable to load asset.");
+          setError(cause instanceof ApiError ? cause.message : "자산을 불러오지 못했습니다.");
         }
       }
     }
@@ -119,7 +119,9 @@ export function RegistryDetailPageContent({
         }
       } catch (cause) {
         if (active) {
-          setError(cause instanceof ApiError ? cause.message : "Unable to load manifest.");
+          setError(
+            cause instanceof ApiError ? cause.message : "매니페스트를 불러오지 못했습니다.",
+          );
         }
       }
     }
@@ -140,64 +142,79 @@ export function RegistryDetailPageContent({
   }
 
   if (!asset) {
-    return <p className="muted">Loading asset…</p>;
+    return (
+      <section className="workspace-panel state-panel" aria-busy="true">
+        <p className="muted">자산을 불러오는 중입니다.</p>
+      </section>
+    );
   }
 
   return (
-    <div className="detail-grid">
-      <section className="card">
+    <div className="page-stack">
+      <section className="workspace-panel design-hero">
         <div className="page-header">
           <div>
-            <h1>{asset.name}</h1>
-            <p className="muted">{asset.slug}</p>
+            <p className="eyebrow">워크플로 자산</p>
+            <h1 className="workspace-heading">{asset.name}</h1>
+            <p className="page-description">{asset.slug}</p>
           </div>
           <StatusBadge label={asset.lifecycle} />
         </div>
         <p>{asset.description}</p>
-        <p className="muted">Visibility: {asset.visibility}</p>
+        <p className="muted">공개 범위: {asset.visibility}</p>
       </section>
 
-      <section className="card">
-        <h2>Published versions</h2>
+      {error ? <p className="error-text" role="alert">{error}</p> : null}
+
+      <div className="registry-detail-grid">
+      <section className="workspace-panel">
+        <p className="eyebrow">버전 선택</p>
+        <h2>게시 버전</h2>
         {versions.length === 0 ? (
-          <p className="muted">No published versions.</p>
+          <p className="muted">게시된 버전이 없습니다.</p>
         ) : (
-          <div className="finding-list">
+          <div className="version-list">
             {versions.map((version) => (
               <button
+                className="version-button"
                 key={version.id}
                 type="button"
                 onClick={() => setSelectedVersionId(version.id)}
+                aria-pressed={selectedVersion?.id === version.id}
               >
-                {version.version} · {version.channel}
+                <span>{version.version}</span>
+                <StatusBadge label={version.channel} />
               </button>
             ))}
           </div>
         )}
       </section>
 
-      <section className="card">
-        <h2>Release status</h2>
+      <section className="workspace-panel">
+        <p className="eyebrow">검토 근거</p>
+        <h2>릴리스 상태</h2>
         {selectedVersion ? (
           <>
             <p>
-              Version <strong>{selectedVersion.version}</strong>
+              버전 <strong>{selectedVersion.version}</strong>
             </p>
             <p>
               <StatusBadge label={selectedVersion.status} />{" "}
               <StatusBadge label={selectedVersion.channel} />
             </p>
             <p className="digest-text">{selectedVersion.artifact_sha256}</p>
-            <p className="muted">Validation: {validationStatus(selectedVersion)}</p>
-            <p className="muted">Approval: {approvalStatus(selectedVersion)}</p>
+            <p className="muted">검증: {validationStatus(selectedVersion)}</p>
+            <p className="muted">승인: {approvalStatus(selectedVersion)}</p>
           </>
         ) : (
-          <p className="muted">No released version selected.</p>
+          <p className="muted">선택된 게시 버전이 없습니다.</p>
         )}
       </section>
+      </div>
 
-      <section className="card">
-        <h2>Immutable manifest summary</h2>
+      <section className="workspace-panel manifest-panel">
+        <p className="eyebrow">배포 계약</p>
+        <h2>변경 불가 매니페스트</h2>
         {manifest ? (
           <div className="finding-list">
             <pre className="manifest-block">
@@ -205,7 +222,7 @@ export function RegistryDetailPageContent({
             </pre>
           </div>
         ) : (
-          <p className="muted">Select a published version to view its manifest summary.</p>
+          <p className="muted">게시 버전을 선택하면 매니페스트 요약을 표시합니다.</p>
         )}
       </section>
     </div>

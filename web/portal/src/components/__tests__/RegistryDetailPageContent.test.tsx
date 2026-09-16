@@ -62,6 +62,10 @@ describe("RegistryDetailPageContent", () => {
     render(<RegistryDetailPageContent slug="issue-to-pr" />);
 
     expect(await screen.findByRole("heading", { name: "Issue to PR" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "게시 버전" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "변경 불가 매니페스트" })).toBeInTheDocument();
+    expect(screen.getByText("검증: 검증됨")).toBeInTheDocument();
+    expect(screen.getByText("승인: 승인됨")).toBeInTheDocument();
     expect(await screen.findByText("b".repeat(64))).toBeInTheDocument();
     const manifestBlock = await screen.findByText((_, element) =>
       element?.tagName === "PRE" &&

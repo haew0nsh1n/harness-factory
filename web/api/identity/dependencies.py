@@ -53,9 +53,7 @@ def _get_entra_validator(request: Request, settings) -> EntraTokenValidator:
     return validator
 
 
-def get_actor(
-    request: Request, session: Session = Depends(get_session)
-) -> Actor:
+def resolve_actor(request: Request, session: Session) -> Actor:
     settings = request.app.state.settings
     if settings.auth_mode == "development":
         if not settings.allow_insecure_development_auth:
@@ -95,8 +93,34 @@ def get_actor(
     )
 
 
+def get_actor(
+    request: Request, session: Session = Depends(get_session)
+) -> Actor:
+    return resolve_actor(request, session)
+
+
+def get_actor_short_session(request: Request) -> Actor:
+    session = request.app.state.session_factory()
+    try:
+        return resolve_actor(request, session)
+    finally:
+        session.rollback()
+        session.close()
+
+
 def require_roles(*allowed: str):
     def dependency(actor: Actor = Depends(get_actor)) -> Actor:
+        if not actor.roles.intersection(allowed):
+            raise HTTPException(status_code=403, detail="required role missing")
+        return actor
+
+    return dependency
+
+
+def require_roles_short_session(*allowed: str):
+    def dependency(
+        actor: Actor = Depends(get_actor_short_session),
+    ) -> Actor:
         if not actor.roles.intersection(allowed):
             raise HTTPException(status_code=403, detail="required role missing")
         return actor

@@ -1,18 +1,26 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from web.api.config import get_settings
 from web.api.db import Base
 from web.api.designs.models import HarnessDesign
 from web.api.builds.models import BuildJob
+from web.api.interviews.models import (
+    InterviewOperation,
+    InterviewProposal,
+    InterviewSession,
+    InterviewTurn,
+)
+from web.api.interviews.service import delete_expired_interviews
 from web.api.organizations.models import Organization
 from web.api.registry.models import Asset, AssetVersion
 
@@ -20,11 +28,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def create_sqlite_engine():
-    return create_engine(
+    engine = create_engine(
         "sqlite+pysqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+    @event.listens_for(engine, "connect")
+    def enable_foreign_keys(dbapi_connection, connection_record):
+        del connection_record
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
+    return engine
 
 
 def create_alembic_config(database_url: str) -> Config:
@@ -48,6 +63,10 @@ def test_schema_registers_required_tables_and_unique_constraints():
         "assets",
         "asset_versions",
         "audit_events",
+        "interview_sessions",
+        "interview_operations",
+        "interview_turns",
+        "interview_proposals",
     }
 
     asset_unique_constraints = {
@@ -94,6 +113,30 @@ def test_schema_registers_tenant_columns_and_lookup_indexes():
         tuple(foreign_key["constrained_columns"]): tuple(foreign_key["referred_columns"])
         for foreign_key in inspector.get_foreign_keys("asset_versions")
     }
+    interview_turn_foreign_keys = {
+        tuple(foreign_key["constrained_columns"]): tuple(
+            foreign_key["referred_columns"]
+        )
+        for foreign_key in inspector.get_foreign_keys("interview_turns")
+    }
+    interview_operation_foreign_keys = {
+        tuple(foreign_key["constrained_columns"]): tuple(
+            foreign_key["referred_columns"]
+        )
+        for foreign_key in inspector.get_foreign_keys("interview_operations")
+    }
+    interview_proposal_foreign_keys = {
+        tuple(foreign_key["constrained_columns"]): tuple(
+            foreign_key["referred_columns"]
+        )
+        for foreign_key in inspector.get_foreign_keys("interview_proposals")
+    }
+    accepted_design_foreign_key = next(
+        foreign_key
+        for foreign_key in inspector.get_foreign_keys("interview_proposals")
+        if tuple(foreign_key["constrained_columns"])
+        == ("organization_id", "accepted_design_id")
+    )
     approval_indexes = {
         index["name"]: tuple(index["column_names"])
         for index in inspector.get_indexes("approvals")
@@ -110,12 +153,43 @@ def test_schema_registers_tenant_columns_and_lookup_indexes():
         index["name"]: tuple(index["column_names"])
         for index in inspector.get_indexes("asset_versions")
     }
+    interview_operation_unique_constraints = {
+        tuple(constraint["column_names"])
+        for constraint in inspector.get_unique_constraints("interview_operations")
+    }
+    harness_design_unique_constraints = {
+        tuple(constraint["column_names"])
+        for constraint in inspector.get_unique_constraints("harness_designs")
+    }
 
     assert build_job_columns["organization_id"]["nullable"] is False
     assert harness_design_columns["validation_findings_json"]["nullable"] is True
     assert asset_version_columns["organization_id"]["nullable"] is False
     assert build_job_foreign_keys[("organization_id",)] == ("id",)
     assert asset_version_foreign_keys[("organization_id",)] == ("id",)
+    assert interview_turn_foreign_keys[
+        ("organization_id", "session_id")
+    ] == ("organization_id", "id")
+    assert interview_turn_foreign_keys[
+        ("organization_id", "session_id", "operation_id")
+    ] == ("organization_id", "session_id", "id")
+    assert interview_operation_foreign_keys[
+        ("organization_id", "session_id")
+    ] == ("organization_id", "id")
+    assert (
+        "organization_id",
+        "session_id",
+        "id",
+    ) in interview_operation_unique_constraints
+    assert ("organization_id", "id") in harness_design_unique_constraints
+    assert interview_proposal_foreign_keys[
+        ("organization_id", "session_id")
+    ] == ("organization_id", "id")
+    assert interview_proposal_foreign_keys[
+        ("organization_id", "accepted_design_id")
+    ] == ("organization_id", "id")
+    assert accepted_design_foreign_key["referred_table"] == "harness_designs"
+    assert accepted_design_foreign_key["options"]["ondelete"] == "RESTRICT"
     assert build_job_indexes["ix_build_jobs_organization_id"] == ("organization_id",)
     assert (
         asset_version_indexes["ix_asset_versions_organization_id"]
@@ -131,6 +205,262 @@ def test_schema_registers_tenant_columns_and_lookup_indexes():
         "resource_type",
         "resource_id",
     )
+
+
+def test_interview_turn_operation_fk_rejects_cross_tenant_reference_and_isolates_cascade():
+    engine = create_sqlite_engine()
+    Base.metadata.create_all(engine)
+    now = datetime.now(UTC)
+
+    def stored_session(organization_id: str, session_id: str) -> InterviewSession:
+        return InterviewSession(
+            id=session_id,
+            organization_id=organization_id,
+            owner_subject_id="author",
+            name="Interview",
+            customer_id=organization_id,
+            revision=0,
+            status="active",
+            consent_version="2026-09-15",
+            consented_at=now,
+            stage="discovery",
+            selected_scope=None,
+            proposed_evidence_json=[],
+            confirmed_evidence_json=[],
+            creation_request_id=str(uuid4()),
+            creation_input_digest="a" * 64,
+            created_at=now,
+            updated_at=now,
+            expires_at=now + timedelta(days=30),
+        )
+
+    with Session(engine) as db:
+        db.add_all(
+            [
+                Organization(
+                    id="org-a",
+                    entra_tenant_id="tenant-a",
+                    name="A",
+                ),
+                Organization(
+                    id="org-b",
+                    entra_tenant_id="tenant-b",
+                    name="B",
+                ),
+            ]
+        )
+        db.flush()
+        db.add_all(
+            [
+                stored_session("org-a", "session-a"),
+                stored_session("org-b", "session-b"),
+            ]
+        )
+        db.flush()
+        operation_a = InterviewOperation(
+            id="operation-a",
+            organization_id="org-a",
+            session_id="session-a",
+            request_id=str(uuid4()),
+            kind="answer",
+            input_digest="b" * 64,
+            status="succeeded",
+            ownership_token=str(uuid4()),
+            base_revision=0,
+            lease_expires_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        operation_b = InterviewOperation(
+            id="operation-b",
+            organization_id="org-b",
+            session_id="session-b",
+            request_id=str(uuid4()),
+            kind="answer",
+            input_digest="c" * 64,
+            status="succeeded",
+            ownership_token=str(uuid4()),
+            base_revision=0,
+            lease_expires_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add_all([operation_a, operation_b])
+        db.flush()
+        db.add(
+            InterviewTurn(
+                id="turn-b",
+                organization_id="org-b",
+                session_id="session-b",
+                operation_id="operation-b",
+                sequence=1,
+                role="assistant",
+                text="B",
+                created_at=now,
+            )
+        )
+        db.commit()
+
+        db.add(
+            InterviewTurn(
+                id="cross-tenant-turn",
+                organization_id="org-a",
+                session_id="session-a",
+                operation_id="operation-b",
+                sequence=1,
+                role="assistant",
+                text="invalid",
+                created_at=now,
+            )
+        )
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+        db.delete(db.get(InterviewSession, "session-a"))
+        db.commit()
+        assert db.get(InterviewTurn, "turn-b") is not None
+
+
+def test_accepted_design_fk_rejects_invalid_links_and_preserves_design_lifecycle():
+    engine = create_sqlite_engine()
+    Base.metadata.create_all(engine)
+    now = datetime.now(UTC)
+
+    def stored_session(
+        organization_id: str,
+        session_id: str,
+        *,
+        expires_at: datetime,
+    ) -> InterviewSession:
+        return InterviewSession(
+            id=session_id,
+            organization_id=organization_id,
+            owner_subject_id="author",
+            name="Interview",
+            customer_id=organization_id,
+            revision=1,
+            status="completed",
+            consent_version="2026-09-15",
+            consented_at=now,
+            stage="summary",
+            selected_scope="issue-to-reviewed-pr",
+            proposed_evidence_json=[],
+            confirmed_evidence_json=[],
+            creation_request_id=str(uuid4()),
+            creation_input_digest="a" * 64,
+            created_at=now,
+            updated_at=now,
+            expires_at=expires_at,
+        )
+
+    def design(organization_id: str, design_id: str) -> HarnessDesign:
+        return HarnessDesign(
+            id=design_id,
+            organization_id=organization_id,
+            customer_id=organization_id,
+            name="Design",
+            profile_json={},
+            workflow_json={},
+            scenarios_json=[],
+            catalog_json={},
+            revision=1,
+            digest="d" * 64,
+            status="draft",
+            created_by="author",
+            created_at=now,
+            updated_at=now,
+        )
+
+    def proposal(
+        organization_id: str,
+        session_id: str,
+        proposal_id: str,
+        accepted_design_id: str,
+    ) -> InterviewProposal:
+        return InterviewProposal(
+            id=proposal_id,
+            organization_id=organization_id,
+            session_id=session_id,
+            revision=1,
+            digest="e" * 64,
+            status="accepted",
+            candidate_json={},
+            findings_json=[],
+            accepted_design_id=accepted_design_id,
+            created_at=now,
+            updated_at=now,
+        )
+
+    with Session(engine) as db:
+        db.add_all(
+            [
+                Organization(id="org-a", entra_tenant_id="tenant-a", name="A"),
+                Organization(id="org-b", entra_tenant_id="tenant-b", name="B"),
+            ]
+        )
+        db.flush()
+        db.add_all(
+            [
+                stored_session(
+                    "org-a",
+                    "session-a",
+                    expires_at=now + timedelta(days=1),
+                ),
+                stored_session(
+                    "org-b",
+                    "session-b",
+                    expires_at=now + timedelta(days=1),
+                ),
+                design("org-a", "design-a"),
+                design("org-b", "design-b"),
+            ]
+        )
+        db.commit()
+
+        db.add(proposal("org-a", "session-a", "cross-tenant", "design-b"))
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+        db.add(proposal("org-a", "session-a", "dangling", "missing-design"))
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+        db.add(proposal("org-a", "session-a", "accepted-a", "design-a"))
+        db.commit()
+        db.delete(db.get(HarnessDesign, "design-a"))
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+        db.delete(db.get(InterviewSession, "session-a"))
+        db.commit()
+        assert db.get(HarnessDesign, "design-a") is not None
+
+        expired_session = stored_session(
+            "org-a",
+            "expired-session",
+            expires_at=now - timedelta(seconds=1),
+        )
+        expired_design = design("org-a", "expired-design")
+        db.add_all([expired_session, expired_design])
+        db.flush()
+        db.add(
+            proposal(
+                "org-a",
+                "expired-session",
+                "expired-proposal",
+                "expired-design",
+            )
+        )
+        db.commit()
+
+    assert delete_expired_interviews(sessionmaker(engine), now=now) == 1
+    with Session(engine) as db:
+        assert db.get(InterviewSession, "expired-session") is None
+        assert db.get(HarnessDesign, "expired-design") is not None
 
 
 def test_alembic_upgrade_from_0002_to_head_and_downgrade_base(
@@ -176,12 +506,59 @@ def test_alembic_upgrade_from_0002_to_head_and_downgrade_base(
             tuple(constraint["column_names"])
             for constraint in inspector.get_unique_constraints("build_jobs")
         }
+        interview_operation_unique_constraints = {
+            tuple(constraint["column_names"])
+            for constraint in inspector.get_unique_constraints(
+                "interview_operations"
+            )
+        }
+        interview_turn_foreign_keys = {
+            tuple(foreign_key["constrained_columns"]): tuple(
+                foreign_key["referred_columns"]
+            )
+            for foreign_key in inspector.get_foreign_keys("interview_turns")
+        }
+        interview_proposal_foreign_keys = {
+            tuple(foreign_key["constrained_columns"]): tuple(
+                foreign_key["referred_columns"]
+            )
+            for foreign_key in inspector.get_foreign_keys(
+                "interview_proposals"
+            )
+        }
+        accepted_design_foreign_key = next(
+            foreign_key
+            for foreign_key in inspector.get_foreign_keys(
+                "interview_proposals"
+            )
+            if tuple(foreign_key["constrained_columns"])
+            == ("organization_id", "accepted_design_id")
+        )
+        harness_design_unique_constraints = {
+            tuple(constraint["column_names"])
+            for constraint in inspector.get_unique_constraints(
+                "harness_designs"
+            )
+        }
         assert harness_design_columns["validation_findings_json"]["nullable"] is True
         assert (
             "organization_id",
             "design_id",
             "design_digest",
         ) in build_job_unique_constraints
+        assert (
+            "organization_id",
+            "session_id",
+            "id",
+        ) in interview_operation_unique_constraints
+        assert interview_turn_foreign_keys[
+            ("organization_id", "session_id", "operation_id")
+        ] == ("organization_id", "session_id", "id")
+        assert ("organization_id", "id") in harness_design_unique_constraints
+        assert interview_proposal_foreign_keys[
+            ("organization_id", "accepted_design_id")
+        ] == ("organization_id", "id")
+        assert accepted_design_foreign_key["options"]["ondelete"] == "RESTRICT"
         engine.dispose()
 
         command.downgrade(config, "0002_validation_findings")
@@ -206,6 +583,118 @@ def test_alembic_upgrade_from_0002_to_head_and_downgrade_base(
         table_names = set(inspector.get_table_names())
         assert "organizations" not in table_names
         assert "harness_designs" not in table_names
+        engine.dispose()
+    finally:
+        get_settings.cache_clear()
+
+
+def test_alembic_0007_preserves_existing_accepted_proposal_link(
+    monkeypatch, tmp_path
+):
+    database_path = tmp_path / "proposal-design-fk-migration.db"
+    database_url = f"sqlite+pysqlite:///{database_path}"
+    config = create_alembic_config(database_url)
+    now = datetime.now(UTC)
+
+    monkeypatch.setenv("HF_DATABASE_URL", database_url)
+    get_settings.cache_clear()
+
+    try:
+        command.upgrade(config, "0006_proposal_acceptance")
+        engine = create_engine(database_url)
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO organizations (id, entra_tenant_id, name)
+                    VALUES ('org-acme', 'tenant-acme', 'Acme')
+                    """
+                )
+            )
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO harness_designs (
+                        id, organization_id, customer_id, name, profile_json,
+                        workflow_json, scenarios_json, catalog_json, revision,
+                        digest, status, created_by, created_at, updated_at,
+                        validation_findings_json
+                    ) VALUES (
+                        'design-1', 'org-acme', 'customer-1', 'Design',
+                        '{}', '{}', '[]', '{}', 1, :design_digest, 'draft',
+                        'author-1', :now, :now, NULL
+                    )
+                    """
+                ),
+                {"design_digest": "d" * 64, "now": now},
+            )
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO interview_sessions (
+                        id, organization_id, owner_subject_id, name, customer_id,
+                        revision, status, consent_version, consented_at, stage,
+                        selected_scope, proposed_evidence_json,
+                        confirmed_evidence_json, creation_request_id,
+                        creation_input_digest, created_at, updated_at, expires_at
+                    ) VALUES (
+                        'session-1', 'org-acme', 'author-1', 'Interview',
+                        'customer-1', 1, 'completed', '2026-09-15', :now,
+                        'summary', 'issue-to-reviewed-pr', '[]', '[]',
+                        'creation-request-1', :input_digest, :now, :now, :expires
+                    )
+                    """
+                ),
+                {
+                    "input_digest": "a" * 64,
+                    "now": now,
+                    "expires": now + timedelta(days=1),
+                },
+            )
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO interview_proposals (
+                        id, organization_id, session_id, revision, digest,
+                        status, candidate_json, findings_json, created_at,
+                        updated_at, accepted_design_id
+                    ) VALUES (
+                        'proposal-1', 'org-acme', 'session-1', 1,
+                        :proposal_digest, 'accepted', '{}', '[]', :now, :now,
+                        'design-1'
+                    )
+                    """
+                ),
+                {"proposal_digest": "e" * 64, "now": now},
+            )
+        engine.dispose()
+
+        command.upgrade(config, "head")
+
+        engine = create_engine(database_url)
+        inspector = inspect(engine)
+        assert ("organization_id", "id") in {
+            tuple(constraint["column_names"])
+            for constraint in inspector.get_unique_constraints("harness_designs")
+        }
+        accepted_design_foreign_key = next(
+            foreign_key
+            for foreign_key in inspector.get_foreign_keys(
+                "interview_proposals"
+            )
+            if tuple(foreign_key["constrained_columns"])
+            == ("organization_id", "accepted_design_id")
+        )
+        assert accepted_design_foreign_key["options"]["ondelete"] == "RESTRICT"
+        with engine.begin() as connection:
+            assert connection.scalar(
+                text(
+                    """
+                    SELECT COUNT(*) FROM interview_proposals
+                    WHERE id = 'proposal-1' AND accepted_design_id = 'design-1'
+                    """
+                )
+            ) == 1
         engine.dispose()
     finally:
         get_settings.cache_clear()
