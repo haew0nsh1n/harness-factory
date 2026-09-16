@@ -51,6 +51,9 @@ class InterviewSession(Base):
     customer_id: Mapped[str] = mapped_column(String(80), nullable=False)
     revision: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+    language: Mapped[str] = mapped_column(
+        String(8), nullable=False, default="ko", server_default="ko"
+    )
     consent_version: Mapped[str] = mapped_column(String(32), nullable=False)
     consented_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

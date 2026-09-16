@@ -67,6 +67,7 @@ class StartInterviewRequest(StrictModel):
     )
     consent_version: Literal["2026-09-15"]
     consent_accepted: Literal[True]
+    language: Literal["ko", "en"] = "ko"
     request_id: UUID = Field(strict=False)
     selected_stages: list[LifecycleStage] | None = Field(
         default=None, min_length=1, max_length=7

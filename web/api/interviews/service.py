@@ -98,6 +98,7 @@ class InterviewService:
             "name": request.name,
             "customer_id": request.customer_id,
             "consent_version": request.consent_version,
+            "language": request.language,
         }
         if "selected_stages" in request.model_fields_set:
             digest_input["selected_stages"] = list(
@@ -129,6 +130,7 @@ class InterviewService:
             confirmed_evidence=(),
             stage=selected_stages[0],
             selected_scope=None,
+            language=request.language,
             selected_stages=selected_stages,
         )
         await self._run_model_operation(
@@ -161,6 +163,7 @@ class InterviewService:
                 customer_id=request.customer_id,
                 revision=0,
                 status="active",
+                language=request.language,
                 consent_version=request.consent_version,
                 consented_at=now,
                 stage=selected_stages[0],
@@ -884,6 +887,7 @@ class InterviewService:
             ),
             stage=session.stage,
             selected_scope=session.selected_scope,
+            language=session.language,
             selected_stages=stored_stages(session.selected_stages_json),
         )
 

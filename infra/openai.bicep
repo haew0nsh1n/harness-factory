@@ -7,6 +7,12 @@ param deploymentName string
 @description('Foundry project name created under the account.')
 param projectName string = 'hf-interview'
 
+@description('Backing model for the interview deployment. Must support reasoning.effort and text.verbosity.')
+param modelName string = 'gpt-5.6-luna'
+
+@description('Backing model version.')
+param modelVersion string = '2026-07-09'
+
 @description('Principal id granted the Cognitive Services OpenAI User role (keyless access).')
 param principalId string
 
@@ -45,7 +51,8 @@ resource project 'Microsoft.CognitiveServices/accounts/projects@2025-04-01-previ
 }
 
 // Model deployment is account-scoped and surfaced in the Foundry project.
-// Deployment name is what the app calls; the backing model is a broadly available default.
+// Deployment name is what the app calls; the backing model is a reasoning model
+// (gpt-5.x) so the interview proposal step can use reasoning.effort and verbosity.
 resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01-preview' = {
   parent: account
   name: deploymentName
@@ -56,8 +63,8 @@ resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01
   properties: {
     model: {
       format: 'OpenAI'
-      name: 'gpt-4o'
-      version: '2024-11-20'
+      name: modelName
+      version: modelVersion
     }
   }
   dependsOn: [

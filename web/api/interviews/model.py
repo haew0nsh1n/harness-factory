@@ -32,6 +32,7 @@ class InterviewContext(ImmutableModel):
     confirmed_evidence: tuple[ConfirmedEvidence, ...]
     stage: Stage
     selected_scope: str | None
+    language: Literal["ko", "en"] = "ko"
     selected_stages: tuple[LifecycleStage, ...] = (
         "discovery",
         "planning",

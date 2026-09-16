@@ -4,6 +4,7 @@ export interface StartOperationEnvelope {
   customer_id: string;
   consent_version: "2026-09-15";
   consent_accepted: true;
+  language: "ko" | "en";
   selected_stages: string[];
 }
 
