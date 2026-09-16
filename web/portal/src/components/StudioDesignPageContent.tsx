@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { JsonEditor } from "@/components/JsonEditor";
+import { RegistryPublishPanel } from "@/components/RegistryPublishPanel";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DebugJsonDisclosure } from "@/components/studio/DebugJsonDisclosure";
 import {
@@ -734,6 +735,8 @@ export function StudioDesignPageContent({
         )}
       </section>
       </div>
+
+      <RegistryPublishPanel design={design} />
 
       <DebugJsonDisclosure
         label="고급 / 디버그 JSON"

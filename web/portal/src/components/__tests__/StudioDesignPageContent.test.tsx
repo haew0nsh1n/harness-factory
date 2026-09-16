@@ -120,6 +120,33 @@ describe("StudioDesignPageContent", () => {
     },
   );
 
+  test("renders registry registration only for a built design without changing lifecycle actions", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        jsonResponse({ ok: true, design: designFixture("built") }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          actor: {
+            organization_id: "org-acme",
+            subject_id: "author-1",
+            roles: ["author", "reviewer", "registry-admin"],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ ok: true, items: [] }));
+
+    render(<StudioDesignPageContent designId="design-1" />);
+
+    expect(
+      await screen.findByRole("heading", { name: "레지스트리 등록" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "설계 검증" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "다이제스트 승인" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "빌드 요청" })).toBeEnabled();
+  });
+
   test("shows field-specific parse validation and prevents submission", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")

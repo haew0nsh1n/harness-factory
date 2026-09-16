@@ -387,6 +387,12 @@ uv run --frozen --no-config uvicorn web.api.main:create_app \
   --factory --host 127.0.0.1 --port 8000
 ```
 
+`--with-sample-designs`는 개발 환경 전용 명시적 플래그로, 4개의 가상 초안
+설계(`issue-planning`, `test-first-implementation`, `code-review`, `manual-handoff`)와
+함께 동일한 템플릿의 Registry 게시 에셋(버전 `1.0.0`, `stable` 채널) 및
+로컬 다운로드 아티팩트(`package.tar`)를 멱등하게 시딩합니다. 이 작업은 개발
+편의용 가상 데이터이며 고객 승인이나 운영 환경 readiness를 의미하지 않습니다.
+
 다른 터미널에서 포털 프록시를 같은 loopback host API로 연결합니다.
 
 ```bash

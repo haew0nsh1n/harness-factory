@@ -23,6 +23,10 @@ from web.api.designs.repository import ensure_sqlite_write_transaction
 from web.api.designs.samples import SampleDesignSeedInvalid, seed_sample_designs
 from web.api.identity.models import ROLES
 from web.api.organizations.models import Membership, Organization
+from web.api.registry.samples import (
+    SampleRegistrySeedInvalid,
+    seed_sample_registry,
+)
 
 
 class DevelopmentBootstrapNotAllowed(RuntimeError):
@@ -135,7 +139,10 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument(
         "--with-sample-designs",
         action="store_true",
-        help="insert missing fictional draft sample designs",
+        help=(
+            "insert missing fictional draft sample designs and "
+            "published registry samples"
+        ),
     )
     return result
 
@@ -168,10 +175,26 @@ def main(argv: list[str] | None = None) -> int:
                     }
                     for sample in samples
                 ]
+                registry_samples = seed_sample_registry(
+                    session,
+                    organization_id=settings.development_organization_id,
+                    actor_id=settings.development_subject_id,
+                    artifact_root=settings.artifact_root,
+                )
+                result["sample_registry"] = [
+                    {
+                        "asset_id": sample.asset_id,
+                        "created": sample.created,
+                        "template": sample.template_key,
+                        "version_id": sample.version_id,
+                    }
+                    for sample in registry_samples
+                ]
     except (
         DevelopmentBootstrapNotAllowed,
         DevelopmentBootstrapInvalid,
         SampleDesignSeedInvalid,
+        SampleRegistrySeedInvalid,
         ValueError,
     ) as exc:
         print(
