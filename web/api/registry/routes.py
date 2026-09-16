@@ -75,6 +75,7 @@ def create_asset(
             "type": asset.kind,
             "slug": asset.slug,
             "name": asset.name,
+            "language": asset.language,
             "description": asset.description,
             "owner_subject_id": asset.owner_subject_id,
             "visibility": asset.visibility,

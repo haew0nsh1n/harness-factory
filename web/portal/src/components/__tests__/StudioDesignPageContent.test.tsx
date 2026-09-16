@@ -19,6 +19,7 @@ function designFixture(status: "draft" | "validated" | "approved" | "build-queue
     organization_id: "org-acme",
     customer_id: "cust-1",
     name: `Design ${status}`,
+    language: "ko",
     profile: {
       ...profileExample,
       sdlc: profileExample.sdlc.slice(0, 1),
@@ -156,21 +157,21 @@ describe("StudioDesignPageContent", () => {
 
     await screen.findByRole("heading", { name: "Design draft" });
     fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
-    fireEvent.change(screen.getByLabelText("워크플로 JSON"), {
+    fireEvent.change(screen.getByLabelText("워크플로우 JSON"), {
       target: { value: "{bad-workflow" },
     });
     fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
     fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
 
     expect(
-      (await screen.findAllByText(/워크플로 JSON이 올바르지 않습니다:/i)).length,
+      (await screen.findAllByText(/워크플로우 JSON이 올바르지 않습니다:/i)).length,
     ).toBeGreaterThan(0);
     expect(
       screen.getByRole("button", { name: "디버그 JSON 열고 수정" }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "디버그 JSON 열고 수정" }));
     await waitFor(() =>
-      expect(screen.getByRole("textbox", { name: "워크플로 JSON" })).toHaveFocus(),
+      expect(screen.getByRole("textbox", { name: "워크플로우 JSON" })).toHaveFocus(),
     );
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
@@ -184,24 +185,24 @@ describe("StudioDesignPageContent", () => {
 
     await screen.findByRole("heading", { name: "Design draft" });
     expect(
-      screen.getByRole("textbox", { name: "워크플로 JSON" }),
+      screen.getByRole("textbox", { name: "워크플로우 JSON" }),
     ).not.toBeVisible();
 
     const summary = screen.getByText("고급 / 디버그 JSON");
     summary.focus();
     fireEvent.keyDown(summary, { key: "Enter" });
     fireEvent.click(summary);
-    const workflowJson = screen.getByRole("textbox", { name: "워크플로 JSON" });
+    const workflowJson = screen.getByRole("textbox", { name: "워크플로우 JSON" });
     fireEvent.change(workflowJson, { target: { value: "{still-invalid" } });
     fireEvent.click(summary);
     expect(
-      screen.getByRole("textbox", { name: "워크플로 JSON" }),
+      screen.getByRole("textbox", { name: "워크플로우 JSON" }),
     ).not.toBeVisible();
 
     summary.focus();
     fireEvent.keyDown(summary, { key: " " });
     fireEvent.click(summary);
-    expect(screen.getByRole("textbox", { name: "워크플로 JSON" })).toHaveValue(
+    expect(screen.getByRole("textbox", { name: "워크플로우 JSON" })).toHaveValue(
       "{still-invalid",
     );
   });
@@ -215,11 +216,11 @@ describe("StudioDesignPageContent", () => {
 
     await screen.findByRole("heading", { name: "Design draft" });
     fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
-    const workflowJson = screen.getByRole("textbox", { name: "워크플로 JSON" });
+    const workflowJson = screen.getByRole("textbox", { name: "워크플로우 JSON" });
     fireEvent.change(workflowJson, { target: { value: "{first-invalid" } });
     fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
     expect(
-      (await screen.findAllByText(/워크플로 JSON이 올바르지 않습니다:/i)).length,
+      (await screen.findAllByText(/워크플로우 JSON이 올바르지 않습니다:/i)).length,
     ).toBeGreaterThan(0);
 
     fireEvent.change(workflowJson, { target: { value: "{second-invalid" } });
@@ -228,7 +229,7 @@ describe("StudioDesignPageContent", () => {
     expect(
       screen.getByRole("button", { name: "디버그 JSON 열고 수정" }),
     ).toBeVisible();
-    expect(screen.getByRole("textbox", { name: "워크플로 JSON" })).not.toBeVisible();
+    expect(screen.getByRole("textbox", { name: "워크플로우 JSON" })).not.toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "디버그 JSON 열고 수정" }));
     await waitFor(() => expect(workflowJson).toHaveFocus());
     expect(workflowJson).toHaveValue("{second-invalid");
@@ -340,7 +341,7 @@ describe("StudioDesignPageContent", () => {
     expect(screen.getByText(/이미 존재하는 용어입니다/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
-    const workflowJson = screen.getByLabelText("워크플로 JSON");
+    const workflowJson = screen.getByLabelText("워크플로우 JSON");
     const originalWorkflow = (workflowJson as HTMLTextAreaElement).value;
     fireEvent.change(workflowJson, { target: { value: "{invalid" } });
     expect(screen.getByText(/구조화된 양식을 갱신할 수 없는 JSON 형식/)).toBeInTheDocument();

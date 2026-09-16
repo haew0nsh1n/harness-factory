@@ -28,6 +28,7 @@ describe("RegistryPageContent", () => {
               type: "workflow",
               slug: "issue-to-pr",
               name: "Issue to PR",
+              language: "ko",
               description: "Automates issue to pull request flow.",
               versions: [
                 { id: "v-1", version: "2.0.0", digest: "a".repeat(64), status: "published", channel: "stable", artifact_sha256: "1".repeat(64) },
@@ -57,7 +58,7 @@ describe("RegistryPageContent", () => {
 
     render(<RegistryPageContent />);
 
-    expect(await screen.findByText("게시된 워크플로가 없습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("게시된 워크플로우가 없습니다.")).toBeInTheDocument();
     expect(screen.queryByLabelText(/password|token|credential|organization/i)).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/password|token|credential|organization/i)).not.toBeInTheDocument();
   });
@@ -68,7 +69,7 @@ describe("RegistryPageContent", () => {
       .mockResolvedValue(jsonResponse({ ok: true, items: [] }));
 
     render(<RegistryPageContent />);
-    await screen.findByText("게시된 워크플로가 없습니다.");
+    await screen.findByText("게시된 워크플로우가 없습니다.");
 
     fireEvent.change(screen.getByRole("searchbox", { name: "자산 검색" }), {
       target: { value: "issue" },
@@ -105,7 +106,7 @@ describe("RegistryPageContent", () => {
       await screen.findByRole("alert"),
     ).toHaveTextContent("레지스트리 서비스에 연결할 수 없습니다.");
     expect(
-      screen.queryByText("게시된 워크플로가 없습니다."),
+      screen.queryByText("게시된 워크플로우가 없습니다."),
     ).not.toBeInTheDocument();
   });
 });

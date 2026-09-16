@@ -8,6 +8,8 @@ from web.api.validation import require_sha256_digest
 from web.api.designs.models import (
     APPROVAL_DECISION_APPROVED,
     APPROVAL_DECISION_REJECTED,
+    CONTENT_LANGUAGE_DEFAULT,
+    CONTENT_LANGUAGES,
     HarnessDesign,
 )
 
@@ -24,6 +26,7 @@ class HarnessDesignRequest(BaseModel):
     expected_digest: str | None = Field(default=None, min_length=64, max_length=64)
     customer_id: str
     name: str
+    language: str = CONTENT_LANGUAGE_DEFAULT
     profile: dict[str, Any]
     workflow: dict[str, Any]
     scenarios: dict[str, Any]
@@ -35,6 +38,13 @@ class HarnessDesignRequest(BaseModel):
         if value is None:
             return None
         return require_sha256_digest(value, "expected_digest")
+
+    @field_validator("language")
+    @classmethod
+    def validate_language(cls, value: str) -> str:
+        if value not in CONTENT_LANGUAGES:
+            raise ValueError(f"language must be one of {sorted(CONTENT_LANGUAGES)}")
+        return value
 
 
 class ValidationFinding(BaseModel):
@@ -63,6 +73,7 @@ class HarnessDesignResponse(BaseModel):
     organization_id: str
     customer_id: str
     name: str
+    language: str
     profile: dict[str, Any]
     workflow: dict[str, Any]
     scenarios: dict[str, Any]
@@ -82,6 +93,7 @@ def to_design_response(design: HarnessDesign) -> HarnessDesignResponse:
         organization_id=design.organization_id,
         customer_id=design.customer_id,
         name=design.name,
+        language=design.language,
         profile=design.profile_json,
         workflow=design.workflow_json,
         scenarios=design.scenarios_json,

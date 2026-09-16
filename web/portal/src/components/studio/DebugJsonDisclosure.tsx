@@ -6,6 +6,8 @@ import {
   useState,
 } from "react";
 
+import { useTranslations } from "@/i18n/I18nProvider";
+
 import styles from "./DebugJsonDisclosure.module.css";
 
 interface DebugJsonDisclosureProps {
@@ -18,11 +20,14 @@ interface DebugJsonDisclosureProps {
 
 export function DebugJsonDisclosure({
   children,
-  label = "디버그 JSON",
-  hint = "원문 확인이나 복구가 필요할 때만 엽니다.",
+  label,
+  hint,
   errors = [],
   focusTargetLabel,
 }: DebugJsonDisclosureProps) {
+  const t = useTranslations();
+  const displayLabel = label ?? t("debugJson.defaultLabel");
+  const displayHint = hint ?? t("debugJson.defaultHint");
   const [open, setOpen] = useState(false);
   const detailsRef = useRef<HTMLDetailsElement>(null);
 
@@ -44,14 +49,14 @@ export function DebugJsonDisclosure({
     <>
       {errors.length > 0 ? (
         <div className={styles.errorSummary} role="alert">
-          <strong>JSON 오류로 저장할 수 없습니다.</strong>
+          <strong>{t("debugJson.cannotSave")}</strong>
           <ul className={styles.errorList}>
             {errors.map((error, index) => (
               <li key={`${error}-${index}`}>{error}</li>
             ))}
           </ul>
           <button className={styles.fixButton} type="button" onClick={openToFix}>
-            디버그 JSON 열고 수정
+            {t("debugJson.openAndFix")}
           </button>
         </div>
       ) : null}
@@ -63,8 +68,8 @@ export function DebugJsonDisclosure({
       >
         <summary className={styles.summary}>
           <span>
-            <span className={styles.title}>{label}</span>
-            <span className={styles.hint}>{hint}</span>
+            <span className={styles.title}>{displayLabel}</span>
+            <span className={styles.hint}>{displayHint}</span>
           </span>
         </summary>
         <div className={styles.content}>{children}</div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { StatusBadge } from "@/components/StatusBadge";
+import { useLocale, useTranslations } from "@/i18n/I18nProvider";
 import { api, ApiError } from "@/lib/api";
 import type {
   DesignStatus,
@@ -10,28 +11,30 @@ import type {
   InterviewSession,
 } from "@/lib/types";
 
-function recommendedAction(status: DesignStatus): string {
+function recommendedActionKey(status: DesignStatus): string {
   switch (status) {
     case "draft":
-      return "초안 검증";
+      return "studio.action.draft";
     case "validated":
-      return "다이제스트 검토";
+      return "studio.action.validated";
     case "approved":
     case "build-queued":
     case "failed":
-      return "빌드 요청";
+      return "studio.action.build";
     case "built":
-      return "빌드 결과 확인";
+      return "studio.action.built";
     default:
-      return "설계 확인";
+      return "studio.action.default";
   }
 }
 
-function formatTimestamp(value: string): string {
-  return new Date(value).toLocaleString("ko-KR");
+function formatTimestamp(value: string, locale: string): string {
+  return new Date(value).toLocaleString(locale === "ko" ? "ko-KR" : "en-US");
 }
 
 export function StudioPageContent() {
+  const t = useTranslations();
+  const locale = useLocale();
   const [designs, setDesigns] = useState<HarnessDesign[]>([]);
   const [interviews, setInterviews] = useState<InterviewSession[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -59,14 +62,14 @@ export function StudioPageContent() {
               setError(
                 cause instanceof ApiError
                   ? cause.message
-                  : "인터뷰 목록을 불러오지 못했습니다.",
+                  : t("studio.interviewLoadError"),
               );
             }
           }
         }
       } catch (cause) {
         if (active) {
-          setError(cause instanceof ApiError ? cause.message : "설계를 불러오지 못했습니다.");
+          setError(cause instanceof ApiError ? cause.message : t("studio.designLoadError"));
         }
       } finally {
         if (active) {
@@ -80,20 +83,20 @@ export function StudioPageContent() {
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const visibleDesigns = designs.filter((design) => design.language === locale);
 
   return (
     <div className="page-stack">
       <header className="page-intro">
-        <p className="eyebrow">Harness Studio</p>
-        <h1 className="workspace-heading">스튜디오</h1>
-        <p className="page-description">
-          검토 가능한 워크플로 설계의 리비전과 승인 상태를 확인하고 다음 실제
-          작업으로 이동합니다.
-        </p>
+        <p className="eyebrow">{t("studio.eyebrow")}</p>
+        <h1 className="workspace-heading">{t("studio.heading")}</h1>
+        <p className="page-description">{t("studio.description")}</p>
         <div className="actions-row">
           <a className="button-primary" href="/studio/interviews/new">
-            새 AI 인터뷰
+            {t("studio.newInterview")}
           </a>
         </div>
       </header>
@@ -104,28 +107,29 @@ export function StudioPageContent() {
       ) : null}
       {loading ? (
         <div className="workspace-panel state-panel" aria-busy="true">
-          <p className="muted">설계 목록을 불러오는 중입니다.</p>
+          <p className="muted">{t("studio.loadingDesigns")}</p>
         </div>
       ) : null}
-      {!loading && !error && designs.length === 0 ? (
+      {!loading && !error && visibleDesigns.length === 0 ? (
         <div className="workspace-panel state-panel">
-          <h2>아직 저장된 설계가 없습니다.</h2>
-          <p className="muted">
-            설계가 생성되면 검증, 승인, 빌드 상태가 이곳에 표시됩니다.
-          </p>
+          <h2>{t("studio.emptyTitle")}</h2>
+          <p className="muted">{t("studio.emptyDescription")}</p>
         </div>
       ) : null}
       {!loading && !error ? (
         <section className="workspace-panel">
           <div className="section-header">
             <div>
-              <p className="eyebrow">30일 보존</p>
-              <h2>진행 중인 인터뷰</h2>
+              <p className="eyebrow">{t("studio.retention")}</p>
+              <h2>{t("studio.inProgressInterviews")}</h2>
             </div>
-            <p className="record-count">{interviews.length}개</p>
+            <p className="record-count">
+              {interviews.length}
+              {t("common.countUnit")}
+            </p>
           </div>
           {interviews.length === 0 ? (
-            <p className="muted">재개할 인터뷰가 없습니다.</p>
+            <p className="muted">{t("studio.noResumable")}</p>
           ) : (
             <div className="resume-list">
               {interviews.map((interview) => (
@@ -136,38 +140,48 @@ export function StudioPageContent() {
                 >
                   <strong>{interview.name}</strong>
                   <span>
-                    {interview.stage} · 리비전 {interview.revision}
+                    {t("studio.stageRevision", {
+                      stage: interview.stage,
+                      revision: interview.revision,
+                    })}
                   </span>
-                  <span>만료 {formatTimestamp(interview.expires_at)}</span>
+                  <span>
+                    {t("studio.expiresAt", {
+                      time: formatTimestamp(interview.expires_at, locale),
+                    })}
+                  </span>
                 </a>
               ))}
             </div>
           )}
         </section>
       ) : null}
-      {designs.length > 0 ? (
+      {visibleDesigns.length > 0 ? (
         <div className="workspace-panel table-panel">
           <div className="section-header">
             <div>
-              <p className="eyebrow">저장된 설계</p>
-              <h2>설계 목록</h2>
+              <p className="eyebrow">{t("studio.savedDesigns")}</p>
+              <h2>{t("studio.designList")}</h2>
             </div>
-            <p className="record-count">{designs.length}개</p>
+            <p className="record-count">
+              {visibleDesigns.length}
+              {t("common.countUnit")}
+            </p>
           </div>
           <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>설계 이름</th>
-                <th>고객 ID</th>
-                <th>리비전</th>
-                <th>상태</th>
-                <th>마지막 변경</th>
-                <th>다음 작업</th>
+                <th>{t("studio.colName")}</th>
+                <th>{t("studio.colCustomer")}</th>
+                <th>{t("studio.colRevision")}</th>
+                <th>{t("studio.colStatus")}</th>
+                <th>{t("studio.colUpdated")}</th>
+                <th>{t("studio.colNextAction")}</th>
               </tr>
             </thead>
             <tbody>
-              {designs.map((design) => (
+              {visibleDesigns.map((design) => (
                 <tr key={design.id}>
                   <td>
                     <a href={`/studio/${design.id}`}>{design.name}</a>
@@ -177,8 +191,8 @@ export function StudioPageContent() {
                   <td>
                     <StatusBadge label={design.status} />
                   </td>
-                  <td>{formatTimestamp(design.updated_at)}</td>
-                  <td>{recommendedAction(design.status)}</td>
+                  <td>{formatTimestamp(design.updated_at, locale)}</td>
+                  <td>{t(recommendedActionKey(design.status))}</td>
                 </tr>
               ))}
             </tbody>

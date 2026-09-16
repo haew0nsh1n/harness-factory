@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { useTranslations } from "@/i18n/I18nProvider";
+
 interface JsonEditorProps {
   label: string;
   value: unknown;
@@ -16,16 +18,6 @@ function stringifyJson(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
-function localizedLabel(label: string): string {
-  const labels: Record<string, string> = {
-    Catalog: "카탈로그",
-    Profile: "프로필",
-    Scenarios: "시나리오",
-    Workflow: "워크플로",
-  };
-  return labels[label] ?? label;
-}
-
 export function JsonEditor({
   label,
   value,
@@ -35,6 +27,10 @@ export function JsonEditor({
   disabled = false,
   errorMessage = null,
 }: JsonEditorProps) {
+  const t = useTranslations();
+  const labelKey = `jsonEditor.labels.${label}`;
+  const translatedLabel = t(labelKey);
+  const displayLabel = translatedLabel === labelKey ? label : translatedLabel;
   const [text, setText] = useState(() => textValue ?? stringifyJson(value));
   const [error, setError] = useState<string | null>(null);
 
@@ -55,18 +51,16 @@ export function JsonEditor({
       setError(null);
       onSave?.(parsed);
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "알 수 없는 구문 오류";
-      setError(`${localizedLabel(label)} JSON이 올바르지 않습니다: ${message}`);
+      const message = cause instanceof Error ? cause.message : t("jsonEditor.unknownSyntaxError");
+      setError(t("jsonEditor.invalidJson", { label: displayLabel, message }));
     }
   }
-
-  const displayLabel = localizedLabel(label);
 
   return (
     <section className="workspace-panel editor-panel">
       <div className="section-header">
         <div>
-          <p className="eyebrow">고급 편집</p>
+          <p className="eyebrow">{t("jsonEditor.advancedEdit")}</p>
           <h2>{displayLabel}</h2>
         </div>
         {onSave ? (
@@ -76,14 +70,14 @@ export function JsonEditor({
             onClick={handleSave}
             disabled={disabled}
           >
-            {`${displayLabel} 저장`}
+            {t("jsonEditor.save", { label: displayLabel })}
           </button>
         ) : null}
       </div>
       <label className="field">
-        <span>{displayLabel} JSON</span>
+        <span>{t("jsonEditor.jsonSuffix", { label: displayLabel })}</span>
         <textarea
-          aria-label={`${displayLabel} JSON`}
+          aria-label={t("jsonEditor.jsonSuffix", { label: displayLabel })}
           className="json-editor"
           value={text}
           onChange={(event) => handleChange(event.target.value)}

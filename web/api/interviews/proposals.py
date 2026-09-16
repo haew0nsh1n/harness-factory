@@ -241,6 +241,7 @@ class ProposalService:
                 expected_digest=request.expected_design_digest,
                 customer_id=str(profile["customer_id"]),
                 name=str(profile["name"]),
+                language=request.language,
                 profile=profile,
                 workflow=applied_workflow,
                 scenarios=scenarios,

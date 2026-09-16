@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { StatusBadge } from "@/components/StatusBadge";
+import { useLocale, useTranslations } from "@/i18n/I18nProvider";
 import { api, ApiError } from "@/lib/api";
 import type {
   RegistryAssetSummary,
@@ -15,6 +16,8 @@ function onlyPublishedVersions(asset: RegistryAssetSummary): RegistryVersionSumm
 }
 
 export function RegistryPageContent() {
+  const t = useTranslations();
+  const locale = useLocale();
   const [items, setItems] = useState<RegistryAssetSummary[]>([]);
   const [query, setQuery] = useState("");
   const [channel, setChannel] = useState<"" | Exclude<RegistryChannel, "unpublished">>("");
@@ -46,7 +49,7 @@ export function RegistryPageContent() {
           setError(
             cause instanceof ApiError
               ? cause.message
-              : "레지스트리 자산을 불러오지 못했습니다.",
+              : t("registry.loadError"),
           );
         }
       } finally {
@@ -61,48 +64,48 @@ export function RegistryPageContent() {
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel, query]);
 
   const visibleItems = useMemo(
     () =>
       items
+        .filter((item) => item.language === locale)
         .map((item) => ({ ...item, versions: onlyPublishedVersions(item) }))
         .filter((item) => item.versions.length > 0),
-    [items],
+    [items, locale],
   );
 
   return (
     <div className="page-stack">
       <header className="page-intro">
-        <p className="eyebrow">Asset Registry</p>
-        <h1 className="workspace-heading">게시된 워크플로 레지스트리</h1>
-        <p className="page-description">
-          게시 상태가 확인된 버전만 검색하고 변경 불가 매니페스트를 검토합니다.
-        </p>
+        <p className="eyebrow">{t("registry.eyebrow")}</p>
+        <h1 className="workspace-heading">{t("registry.heading")}</h1>
+        <p className="page-description">{t("registry.description")}</p>
       </header>
       <div className="workspace-panel filter-panel">
         <label className="field">
-          <span>자산 검색</span>
+          <span>{t("registry.searchLabel")}</span>
           <input
             type="search"
-            aria-label="자산 검색"
+            aria-label={t("registry.searchLabel")}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="슬러그 또는 이름 검색"
+            placeholder={t("registry.searchPlaceholder")}
           />
         </label>
         <label className="field">
-          <span>배포 채널</span>
+          <span>{t("registry.channelLabel")}</span>
           <select
-            aria-label="배포 채널"
+            aria-label={t("registry.channelLabel")}
             value={channel}
             onChange={(event) =>
               setChannel(event.target.value as "" | "pilot" | "stable")
             }
           >
-            <option value="">게시된 모든 채널</option>
-            <option value="pilot">파일럿</option>
-            <option value="stable">안정</option>
+            <option value="">{t("registry.channelAll")}</option>
+            <option value="pilot">{t("registry.channelPilot")}</option>
+            <option value="stable">{t("registry.channelStable")}</option>
           </select>
         </label>
       </div>
@@ -113,31 +116,31 @@ export function RegistryPageContent() {
       ) : null}
       {loading ? (
         <div className="workspace-panel state-panel" aria-busy="true">
-          <p className="muted">레지스트리를 불러오는 중입니다.</p>
+          <p className="muted">{t("registry.loading")}</p>
         </div>
       ) : null}
       {!loading && !error && visibleItems.length === 0 ? (
         <div className="workspace-panel state-panel">
-          <h2>게시된 워크플로가 없습니다.</h2>
-          <p className="muted">검색어 또는 채널 필터를 변경해 보세요.</p>
+          <h2>{t("registry.emptyTitle")}</h2>
+          <p className="muted">{t("registry.emptyDescription")}</p>
         </div>
       ) : null}
       {visibleItems.length > 0 ? (
         <div className="workspace-panel table-panel">
           <div className="section-header">
             <div>
-              <p className="eyebrow">게시 결과</p>
-              <h2>워크플로 버전</h2>
+              <p className="eyebrow">{t("registry.resultsEyebrow")}</p>
+              <h2>{t("registry.workflowVersions")}</h2>
             </div>
           </div>
           <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>슬러그</th>
-                <th>이름</th>
-                <th>버전</th>
-                <th>채널</th>
+                <th>{t("registry.colSlug")}</th>
+                <th>{t("registry.colName")}</th>
+                <th>{t("registry.colVersion")}</th>
+                <th>{t("registry.colChannel")}</th>
               </tr>
             </thead>
             <tbody>

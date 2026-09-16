@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "customer_id": "fictional-manual-handoff",
+  "name": "Fictional customer - manual handoff sample",
+  "sdlc": [
+    {"stage": "review", "current": "After review, publishing responsibility and resume evidence are unclear.", "desired": "An explicit human owner approves, then creates the PR through the existing process and provides the URL."}
+  ],
+  "glossary": {
+    "review-report": "A review artifact summarizing important defects and test evidence",
+    "resume evidence": "A URL and owner confirmation that verify the PR is for the same change after the manual process"
+  },
+  "systems": [
+    {"id": "repository", "kind": "git-markdown-repository", "tool": "git", "capabilities": ["issue-read"]}
+  ],
+  "issue_tracker": {
+    "system_id": "repository",
+    "provider": "markdown",
+    "connection": "local",
+    "project": "fictional-project",
+    "path": "issues",
+    "skill": null,
+    "mcp": null,
+    "capabilities": ["issue-read"]
+  },
+  "roles": ["consultant", "reviewer", "maintainer"],
+  "pains": [
+    {"description": "After manual publishing it is unclear which evidence should resume the automated flow.", "impact": "Risk of duplicate PRs or false completion reports.", "frequency": "Fictional example; the real frequency is not verified."}
+  ],
+  "success_criteria": [
+    "Do not create a PR without the maintainer's prior approval and direct action.",
+    "Complete the manual step only with a PR URL and reviewed-change confirmation."
+  ],
+  "constraints": [
+    "This is fictional customer information; the real remote repository and permissions are not verified.",
+    "This workflow does not perform automated release, merge, or deploy."
+  ],
+  "facts": [
+    {"id": "fictional-source", "statement": "The sample content is fictional material used to illustrate product behavior.", "evidence": "Development fixture included in the repository"}
+  ],
+  "assumptions": ["The maintainer knows the organization's existing approved PR process."],
+  "unknowns": ["The real PR tools, remote permissions, and remote read connection are not verified."]
+}

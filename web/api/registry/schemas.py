@@ -19,6 +19,7 @@ class AssetCreate(BaseModel):
     type: Literal["workflow"]
     slug: str
     name: str
+    language: str = "ko"
     description: str
     owner_subject_id: str
 
@@ -27,6 +28,13 @@ class AssetCreate(BaseModel):
     def validate_slug(cls, value: str) -> str:
         if not SLUG_RE.fullmatch(value):
             raise ValueError("slug must be a lowercase hyphen identifier")
+        return value
+
+    @field_validator("language")
+    @classmethod
+    def validate_language(cls, value: str) -> str:
+        if value not in {"ko", "en"}:
+            raise ValueError("language must be one of ['en', 'ko']")
         return value
 
 
@@ -99,6 +107,7 @@ class AssetSummaryResponse(BaseModel):
     type: str
     slug: str
     name: str
+    language: str
     description: str | None
     versions: list[VersionSummaryResponse]
 
@@ -109,6 +118,7 @@ class AssetResponse(BaseModel):
     type: str
     slug: str
     name: str
+    language: str
     description: str | None
     owner_subject_id: str
     visibility: str
@@ -147,6 +157,7 @@ def to_asset_summary_response(
         type=asset.kind,
         slug=asset.slug,
         name=asset.name,
+        language=asset.language,
         description=asset.description,
         versions=[to_version_summary_response(version) for version in versions],
     )
@@ -159,6 +170,7 @@ def to_asset_response(asset: Asset, versions: list[AssetVersion]) -> AssetRespon
         type=asset.kind,
         slug=asset.slug,
         name=asset.name,
+        language=asset.language,
         description=asset.description,
         owner_subject_id=asset.owner_subject_id,
         visibility=asset.visibility,

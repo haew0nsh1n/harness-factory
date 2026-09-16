@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "manual-handoff",
+  "name": "Manual PR handoff after review",
+  "customer_id": "fictional-manual-handoff",
+  "goal": "Keep publishing authority for reviewed changes with a human maintainer and obtain clear resume evidence.",
+  "trigger": "A review-report with no important unresolved defects is handed off.",
+  "inputs": ["review-report"],
+  "outputs": ["pr-url"],
+  "customer_rules": [
+    "Do not start the manual process before the maintainer reviews the real review-report and approves in advance.",
+    "The agent does not automatically create a PR, push, merge, release, or deploy.",
+    "If the manual result is uncertain, do not auto-retry; check the existing PR first.",
+    "Do not claim completion without confirming the PR URL matches the reviewed change."
+  ],
+  "approved": {"by": "fictional-fixture-author-not-customer-approval", "at": "2026-09-16T00:00:00+09:00"},
+  "steps": [
+    {
+      "id": "handoff",
+      "name": "Hand off PR publishing to the maintainer",
+      "skill": "hf-manual",
+      "needs": [],
+      "inputs": ["review-report"],
+      "outputs": ["pr-url"],
+      "tools": [],
+      "effect": "manual",
+      "approval": true,
+      "approval_timing": "before",
+      "approver": "maintainer",
+      "completion": "The maintainer provides the PR URL and confirmation that it corresponds to the reviewed change as resume evidence, and states the remote state is unverified.",
+      "failure": "If the URL is missing or the result is uncertain, keep the awaiting-manual or uncertain state and do not request creating a new PR.",
+      "manual": {
+        "owner": "maintainer",
+        "instructions": "Review the real review-report and change, approve explicitly, then publish the branch and create the PR through your organization's existing process. Do not give the agent credentials; after completion, provide the PR URL and confirmation that it matches the reviewed change.",
+        "resume_when": "The maintainer provides the PR URL and confirmation that it matches the reviewed change. This fixture has no remote read connection, so live verification is recorded as unverified."
+      }
+    }
+  ],
+  "traceability": [
+    {"requirement": "Keep publishing authority with a human maintainer.", "steps": ["handoff"], "checks": ["Maintainer approval is required before the manual action.", "The agent does not run PR, merge, release, or deploy."]},
+    {"requirement": "Do not complete without resume evidence.", "steps": ["handoff"], "checks": ["Both the PR URL and reviewed-change confirmation are required.", "Do not auto-retry an uncertain creation result."]}
+  ]
+}

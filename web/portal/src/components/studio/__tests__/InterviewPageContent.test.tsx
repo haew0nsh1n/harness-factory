@@ -103,6 +103,7 @@ const design = {
   organization_id: "org-acme",
   customer_id: "acme",
   name: "Current Acme design",
+  language: "ko" as const,
   profile: profileExample,
   workflow: workflowExample,
   scenarios: scenariosExample,
@@ -230,7 +231,7 @@ describe("InterviewPageContent lifecycle", () => {
     fireEvent.click(screen.getByRole("button", { name: "인터뷰 시작" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "워크플로 범위가 아직 선택되지 않았습니다.",
+      "워크플로우 범위가 아직 선택되지 않았습니다.",
     );
     expect(screen.getByRole("alert")).not.toHaveTextContent(
       "workflow scope has not been selected",
@@ -264,7 +265,7 @@ describe("InterviewPageContent lifecycle", () => {
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "인터뷰를 계속해 새 워크플로 범위를 확정",
+      "인터뷰를 계속해 새 워크플로우 범위를 확정",
     );
     expect(screen.getByRole("alert")).not.toHaveTextContent(
       "selected scope is not a canonical workflow ID",
@@ -761,7 +762,7 @@ describe("InterviewPageContent lifecycle", () => {
       screen.getByRole("button", { name: "최신 상태 다시 불러오기" }),
     );
 
-    await screen.findByText(/워크플로 범위 release-handoff/);
+    await screen.findByText(/워크플로우 범위 release-handoff/);
     expect(confirmation).not.toBeChecked();
     expect(
       screen.getByRole("button", { name: "정확한 제안 적용" }),

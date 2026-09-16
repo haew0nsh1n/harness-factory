@@ -137,6 +137,7 @@ class ApplyProposalRequest(StrictModel):
     proposal_id: UUID = Field(strict=False)
     expected_proposal_digest: str = Field(min_length=64, max_length=64)
     confirm_scope: Literal[True]
+    language: Literal["ko", "en"] = "ko"
     design_id: UUID | None = Field(default=None, strict=False)
     expected_design_digest: str | None = Field(
         default=None, min_length=64, max_length=64

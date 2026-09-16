@@ -42,6 +42,7 @@ class RegistryRepository:
                 kind=request.type,
                 slug=request.slug,
                 name=request.name,
+                language=request.language,
                 description=request.description,
                 owner_subject_id=request.owner_subject_id,
             )

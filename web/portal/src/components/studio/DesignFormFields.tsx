@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 
+import { useTranslations } from "@/i18n/I18nProvider";
 import { isJsonDocument, type JsonDocument } from "@/lib/designForms";
 
 export function displayText(value: unknown): string {
@@ -120,6 +121,7 @@ export function SelectField({
   onChange,
   error,
 }: SelectFieldProps) {
+  const t = useTranslations();
   const current = displayText(value);
   const known = options.includes(current);
   return (
@@ -130,7 +132,7 @@ export function SelectField({
         value={current}
         onChange={(event) => onChange(event.target.value)}
       >
-        {!known ? <option value={current}>현재 값: {current || "(비어 있음)"}</option> : null}
+        {!known ? <option value={current}>{t("formFields.currentValue", { value: current || t("formFields.empty") })}</option> : null}
         {options.map((option) => (
           <option key={option} value={option}>
             {option}
@@ -154,6 +156,7 @@ export function StringListField({
   onChange,
   error,
 }: StringListFieldProps) {
+  const t = useTranslations();
   const rows = stringRows(value);
   return (
     <div className="nested-field-group">
@@ -164,11 +167,11 @@ export function StringListField({
           type="button"
           onClick={() => onChange(appendRow(value, "") as string[])}
         >
-          항목 추가
+          {t("formFields.addItem")}
         </button>
       </div>
       {!Array.isArray(value) && value !== undefined ? (
-        <p className="field-error">{error ?? "현재 값은 목록이어야 합니다. 원본은 유지됩니다."}</p>
+        <p className="field-error">{error ?? t("formFields.mustBeList")}</p>
       ) : null}
       {rows.map((row) => (
         <div className="inline-edit-row" key={`${label}-${row.originalIndex}`}>
@@ -184,12 +187,12 @@ export function StringListField({
           <button
             className="button-secondary button-compact"
             type="button"
-            aria-label={`${label} ${row.originalIndex + 1} 삭제`}
+            aria-label={t("formFields.removeAria", { label, index: row.originalIndex + 1 })}
             onClick={() =>
               onChange(removeRow(value, row.originalIndex) as string[])
             }
           >
-            삭제
+            {t("formFields.remove")}
           </button>
         </div>
       ))}
@@ -209,12 +212,13 @@ export function ObjectListSection({
   onAdd: () => void;
   children: ReactNode;
 }) {
+  const t = useTranslations();
   return (
     <section className="nested-form-section">
       <div className="nested-field-heading">
         <h3>{title}</h3>
         <button className="button-secondary button-compact" type="button" onClick={onAdd}>
-          항목 추가
+          {t("formFields.addItem")}
         </button>
       </div>
       {error ? <p className="field-error">{error}</p> : null}
@@ -234,6 +238,7 @@ export function NestedCard({
   onRemove: () => void;
   children: ReactNode;
 }) {
+  const t = useTranslations();
   return (
     <fieldset className="nested-card">
       <legend>{title}</legend>
@@ -244,7 +249,7 @@ export function NestedCard({
         aria-label={removeLabel}
         onClick={onRemove}
       >
-        삭제
+        {t("formFields.remove")}
       </button>
     </fieldset>
   );
