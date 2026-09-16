@@ -1,0 +1,8 @@
+{
+  "digest": "493409bced3800eba874c059feaee2306757b4f2683315eb1bc6d25e227f52f5",
+  "resources": {
+    "SKILL.md": "bf5d036ecf8c2b87a66067de722f097752cbe24820393170fe1ffe6e826f2453"
+  },
+  "schema_version": 2,
+  "skill_id": "hf-review"
+}

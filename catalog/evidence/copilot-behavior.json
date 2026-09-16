@@ -1,16 +1,16 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "runtime": "copilot-cli",
   "date": "2026-09-10",
   "method": "Read-only Copilot CLI subagent simulations using actual adapted SKILL.md files and independent fictional stimuli, without expected outputs.",
   "scope": "Bounded instruction-following and decision evaluation; not production connector or customer-environment certification.",
-  "skills": {
-    "hf-clarify": "8a1137bd11d7e27d9cb2da342955a5a9820965e7b7aff4ba70623f7691978233",
-    "hf-plan": "ac3c38a4df9d56c3086e7432b70094d7ba716839ed9ab7b4c4d2b14a67ff7c55",
-    "hf-tdd": "9d050c5af135483ff057b636c93ae147558e5989ee2205c5f35d9da314e1304b",
-    "hf-review": "bf5d036ecf8c2b87a66067de722f097752cbe24820393170fe1ffe6e826f2453",
-    "hf-manual": "87ded9a8d16dc20fe96914752ae5de17c83dfae514e608717b3f6687cd55786d",
-    "hf-issues-markdown": "41f2bf65d2ed2e38e0827d3e6f927f22fd991c2a41a250ed250ec94f3f3482d4"
+  "bundles": {
+    "hf-clarify": "77fc1a3ff1e1aef9464822af6932d4f77b13c04965a777145e7915e5da0e2ca3",
+    "hf-plan": "468f2409cf0fe6f8ace561570dc97a1853131261403689687d6eb517ce9f4602",
+    "hf-tdd": "e7775bf77c32c8d9e0ca93dabe621dc4a10d884fea28d1e7da5a1f0dbb1b32b3",
+    "hf-review": "493409bced3800eba874c059feaee2306757b4f2683315eb1bc6d25e227f52f5",
+    "hf-manual": "fd4ced1cfe81a3a0d76f24411d6cdbd541cc3945f5ae3af88fccb01066102e5c",
+    "hf-issues-markdown": "f8094bab0ef8d3e3a694347aa8fef3bb6c0d327bf1fcb62f54afe90b931f89a2"
   },
   "cases": [
     {"id": "normal-handoff", "status": "awaiting-manual", "observed": "Delegated publication to human maintainer; no PR URL or publication claimed.", "pass": true},

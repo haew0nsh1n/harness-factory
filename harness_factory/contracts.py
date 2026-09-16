@@ -1,6 +1,5 @@
 import json
 import re
-import hashlib
 import os
 from datetime import datetime
 from pathlib import Path
@@ -135,19 +134,36 @@ def _unique(items, field, key="id"):
 
 
 def _validate_evidence(root, skill):
+    from .skill_bundle import MANIFEST_NAME, skill_resource_hashes, validate_skill_bundle
+
     field = "catalog.skills.compatibility.evidence"
     report = load_json(relative_path(root, skill["compatibility"]["evidence"], field))
-    _version(report.get("schema_version"), field)
+    version = report.get("schema_version")
+    require(type(version) is int and version in (1, 2),
+            field + ": schema_version must be 1 or 2")
     require(report.get("runtime") == "copilot-cli", field + ": expected copilot-cli runtime")
-    skills = report.get("skills")
-    require(isinstance(skills, dict) and bool(skills), field + ".skills: expected nonempty hash map")
-    for name, digest in skills.items():
-        identifier(name, field + ".skills")
+    directory = relative_path(root, skill["path"], "catalog.skills.path", directory=True)
+    if version == 1:
+        require(not (directory / MANIFEST_NAME).exists(),
+                field + ": schema v2 evidence required for a bundle manifest")
+        resources = skill_resource_hashes(directory)
+        require(set(resources) == {"SKILL.md"},
+                field + ": schema v2 evidence required for additional bundle resources")
+        digests = report.get("skills")
+        digest_field = field + ".skills"
+        actual = resources["SKILL.md"]
+    else:
+        digests = report.get("bundles")
+        digest_field = field + ".bundles"
+        actual = validate_skill_bundle(directory, skill["id"])["digest"]
+    require(isinstance(digests, dict) and bool(digests),
+            digest_field + ": expected nonempty hash map")
+    for name, digest in digests.items():
+        identifier(name, digest_field)
         require(isinstance(digest, str) and re.fullmatch("[a-f0-9]{64}", digest),
-                field + ".skills: invalid SHA-256 hash")
-    entry = relative_path(root, skill["path"], "catalog.skills.path", directory=True) / "SKILL.md"
-    actual = hashlib.sha256(no_symlinks(entry).read_bytes()).hexdigest()
-    require(skills.get(skill["id"]) == actual, field + ": skill hash mismatch; re-evaluate changed SKILL.md")
+                digest_field + ": invalid SHA-256 hash")
+    require(digests.get(skill["id"]) == actual,
+            field + ": bundle or skill hash mismatch; re-evaluate changed skill")
     for case in objects(report.get("cases"), field + ".cases", nonempty=True):
         require(case.get("pass") is True, field + ".cases: all observed cases must have pass=true")
 
@@ -369,7 +385,7 @@ def _validate_profile_tracker(profile):
 
 
 def _validate(profile, workflow, catalog, root):
-    from .skill_bundle import validate_skill_bundle
+    from .skill_bundle import MANIFEST_NAME, skill_resource_hashes, validate_skill_bundle
 
     known_tools, tracker, tracker_tools, tracker_write_tools = _validate_profile_tracker(profile)
 
@@ -395,7 +411,11 @@ def _validate(profile, workflow, catalog, root):
             no_symlinks(child)
             require(child.is_dir() or child.is_file(), "catalog.skills.path: unsupported file")
         _validate_skill_references(directory)
-        validate_skill_bundle(directory, skill["id"])
+        if (directory / MANIFEST_NAME).exists():
+            validate_skill_bundle(directory, skill["id"])
+        else:
+            require(set(skill_resource_hashes(directory)) == {"SKILL.md"},
+                    "skill bundle: bundle.json required for additional resources")
         for key in ("inputs", "outputs"):
             strings(skill[key], "catalog.skills." + key, ids=True)
         strings(skill["requires"], "catalog.skills.requires")

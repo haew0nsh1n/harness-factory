@@ -332,7 +332,7 @@ class EvaluationSealingTests(FixtureCase):
                         )
 
                     public_error = (
-                        "skill hash mismatch"
+                        "skill (?:bundle: resource )?hash mismatch"
                         if field == "skill"
                         else "evaluation receipt.*{}.*stale".format(field)
                     )

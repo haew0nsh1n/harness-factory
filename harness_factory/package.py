@@ -10,6 +10,7 @@ import uuid
 from .contracts import load_json, no_symlinks, require, shape, validate
 from .errors import HarnessError, PackageError
 from .evaluation import validate_receipt, validate_scenarios
+from .skill_bundle import validate_skill_bundle
 
 MANIFEST = ".harness/manifest.json"
 RUNS = ".harness/runs"
@@ -260,8 +261,14 @@ def generate_package(profile, workflow, scenarios, catalog, catalog_root, output
                 new_path = ".harness/" + folder + "/" + skill["id"] + ".txt"
                 write(new_path, (source_root / skill[section][key]).read_bytes())
                 skill[section][key] = new_path
-            provenance.append({"id": skill["id"], "source": original["source"],
-                               "compatibility": original["compatibility"]})
+            provenance.append({
+                "id": skill["id"],
+                "bundle_digest": validate_skill_bundle(
+                    source_root / original["path"], skill["id"]
+                )["digest"],
+                "source": original["source"],
+                "compatibility": original["compatibility"],
+            })
         write(".harness/catalog.json", json_bytes({"schema_version": 1, "skills": selected}))
         write(".harness/provenance.json", json_bytes({"schema_version": 1, "skills": provenance}))
         write(".agents/skills/" + workflow["id"] + "/SKILL.md", _entry(workflow))
@@ -375,7 +382,7 @@ def check_package(package):
                     ".agents/skills/customer-rules/SKILL.md"}
         required.update("harness_factory/" + name + ".py" for name in
                         ("__init__", "__main__", "errors", "contracts", "package", "install",
-                         "preflight", "records", "evaluation", "tracker"))
+                         "preflight", "records", "evaluation", "tracker", "skill_bundle"))
         require(required <= set(actual), "manifest: required files missing")
         profile = load_json(package / ".harness/customer.json")
         workflow = load_json(package / ".harness/workflow.json")

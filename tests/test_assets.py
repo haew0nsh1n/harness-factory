@@ -1,11 +1,11 @@
 from pathlib import Path
 import re
-import hashlib
 import unittest
 from urllib.parse import unquote, urlsplit
 
 from harness_factory import load_json, validate
 from harness_factory.contracts import relative_path
+from harness_factory.skill_bundle import validate_skill_bundle
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -59,12 +59,17 @@ class AssetTests(unittest.TestCase):
                 if row["compatibility"]["status"] == "verified":
                     evidence = relative_path(self.catalog_root, row["compatibility"]["evidence"], "evidence")
                     report = load_json(evidence)
-                    self.assertEqual(report["schema_version"], 1)
+                    self.assertTrue(
+                        {"schema_version", "runtime", "bundles", "cases"} <= set(report)
+                    )
+                    self.assertEqual(report["schema_version"], 2)
                     self.assertEqual(report["runtime"], "copilot-cli")
                     self.assertTrue(report["cases"])
                     self.assertTrue(all(case["pass"] is True for case in report["cases"]))
-                    self.assertEqual(report["skills"][row["id"]],
-                                     hashlib.sha256((self.catalog_root / row["path"] / "SKILL.md").read_bytes()).hexdigest())
+                    bundle = validate_skill_bundle(
+                        self.catalog_root / row["path"], row["id"]
+                    )
+                    self.assertEqual(report["bundles"][row["id"]], bundle["digest"])
 
     def test_example_validates_when_selected_behavior_evidence_is_verified(self):
         profile = load_json(ROOT / "examples/github-issue/profile.json")

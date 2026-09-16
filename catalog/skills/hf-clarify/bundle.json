@@ -1,0 +1,8 @@
+{
+  "digest": "77fc1a3ff1e1aef9464822af6932d4f77b13c04965a777145e7915e5da0e2ca3",
+  "resources": {
+    "SKILL.md": "8a1137bd11d7e27d9cb2da342955a5a9820965e7b7aff4ba70623f7691978233"
+  },
+  "schema_version": 2,
+  "skill_id": "hf-clarify"
+}

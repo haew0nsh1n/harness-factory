@@ -1,0 +1,8 @@
+{
+  "digest": "f8094bab0ef8d3e3a694347aa8fef3bb6c0d327bf1fcb62f54afe90b931f89a2",
+  "resources": {
+    "SKILL.md": "41f2bf65d2ed2e38e0827d3e6f927f22fd991c2a41a250ed250ec94f3f3482d4"
+  },
+  "schema_version": 2,
+  "skill_id": "hf-issues-markdown"
+}

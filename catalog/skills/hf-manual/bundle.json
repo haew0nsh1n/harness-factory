@@ -1,0 +1,8 @@
+{
+  "digest": "fd4ced1cfe81a3a0d76f24411d6cdbd541cc3945f5ae3af88fccb01066102e5c",
+  "resources": {
+    "SKILL.md": "87ded9a8d16dc20fe96914752ae5de17c83dfae514e608717b3f6687cd55786d"
+  },
+  "schema_version": 2,
+  "skill_id": "hf-manual"
+}

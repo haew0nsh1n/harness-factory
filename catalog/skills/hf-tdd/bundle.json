@@ -1,0 +1,8 @@
+{
+  "digest": "e7775bf77c32c8d9e0ca93dabe621dc4a10d884fea28d1e7da5a1f0dbb1b32b3",
+  "resources": {
+    "SKILL.md": "9d050c5af135483ff057b636c93ae147558e5989ee2205c5f35d9da314e1304b"
+  },
+  "schema_version": 2,
+  "skill_id": "hf-tdd"
+}
