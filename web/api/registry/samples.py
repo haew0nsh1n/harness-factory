@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import io
-import json
+import stat
 import tarfile
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID, uuid5
@@ -12,7 +13,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from harness_factory import load_json, validate, validate_scenarios
+from harness_factory import generate_package, load_json, validate, validate_scenarios
+from harness_factory.contracts import no_symlinks, require
 from web.api.designs.digest import canonical_json_bytes, design_digest
 from web.api.designs.models import CONTENT_LANGUAGE_DEFAULT, CONTENT_LANGUAGES
 from web.api.designs.repository import ensure_sqlite_write_transaction
@@ -25,6 +27,7 @@ SAMPLE_TEMPLATE_KEYS = (
     "test-first-implementation",
     "code-review",
     "manual-handoff",
+    "full-sdlc-delivery",
 )
 SAMPLE_VERSION = "1.0.0"
 
@@ -191,50 +194,59 @@ def _load_sample(
     catalog = load_json(catalog_path)
     validate(profile, workflow, catalog, catalog_path.parent)
     validate_scenarios(scenarios, workflow)
-    documents = (
-        ("profile.json", profile),
-        ("workflow.json", workflow),
-        ("scenarios.json", scenarios),
-        ("catalog.json", catalog),
-    )
     return _Sample(
         profile=profile,
         workflow=workflow,
         scenarios=scenarios,
         catalog=catalog,
-        artifact=_build_archive(documents),
+        artifact=_build_full_package(
+            profile, workflow, scenarios, catalog, catalog_path.parent
+        ),
     )
 
 
-def _build_archive(
-    documents: tuple[tuple[str, dict[str, object]], ...],
+def _build_full_package(
+    profile: dict[str, object],
+    workflow: dict[str, object],
+    scenarios: dict[str, object],
+    catalog: dict[str, object],
+    catalog_root: Path,
 ) -> bytes:
-    buffer = io.BytesIO()
-    with tarfile.open(
-        fileobj=buffer,
-        mode="w",
-        format=tarfile.USTAR_FORMAT,
-    ) as archive:
-        for name, document in documents:
-            content = (
-                json.dumps(
-                    document,
-                    ensure_ascii=False,
-                    indent=2,
-                    sort_keys=True,
-                )
-                + "\n"
-            ).encode()
-            info = tarfile.TarInfo(name)
-            info.size = len(content)
-            info.mtime = 0
+    # Emit the same complete package a real build produces so registry samples
+    # download the full harness bundle, not a JSON-only placeholder.
+    with tempfile.TemporaryDirectory() as workspace:
+        root = Path(workspace).resolve()
+        package_root = root / "package"
+        generate_package(
+            profile, workflow, scenarios, catalog, catalog_root, package_root
+        )
+        archive_path = root / "package.tar"
+        _write_deterministic_tar(package_root, archive_path)
+        return archive_path.read_bytes()
+
+
+def _write_deterministic_tar(package_root: Path, archive_path: Path) -> None:
+    root = no_symlinks(package_root)
+    entries = sorted(no_symlinks(path) for path in root.rglob("*"))
+    with tarfile.open(archive_path, mode="w", format=tarfile.USTAR_FORMAT) as archive:
+        for path in entries:
+            relative = path.relative_to(root).as_posix()
+            require(relative, "archive: empty relative path")
+            info = tarfile.TarInfo(relative)
+            info.mode = stat.S_IMODE(path.stat().st_mode)
             info.uid = 0
             info.gid = 0
             info.uname = ""
             info.gname = ""
-            info.mode = 0o644
-            archive.addfile(info, io.BytesIO(content))
-    return buffer.getvalue()
+            info.mtime = 0
+            if path.is_dir():
+                info.type = tarfile.DIRTYPE
+                archive.addfile(info)
+                continue
+            require(path.is_file(), f"archive: unsupported entry {relative}")
+            data = path.read_bytes()
+            info.size = len(data)
+            archive.addfile(info, io.BytesIO(data))
 
 
 def _write_artifact(
@@ -248,12 +260,9 @@ def _write_artifact(
     if root != target and root not in target.parents:
         raise SampleRegistrySeedInvalid("sample artifact path escapes artifact root")
     target.parent.mkdir(parents=True, exist_ok=True)
-    if target.exists():
-        if hashlib.sha256(target.read_bytes()).hexdigest() != expected_digest:
-            raise SampleRegistrySeedInvalid(
-                f"sample registry artifact collision: {artifact_key}"
-            )
+    if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() == expected_digest:
         return
+    # Overwrite when the package bytes change (updated code or fixtures).
     temporary = target.with_name(f".{target.name}.{expected_digest}.tmp")
     temporary.write_bytes(content)
     try:
@@ -281,13 +290,16 @@ def _insert_or_validate(
     asset = session.get(Asset, asset_id)
     version = session.get(AssetVersion, version_id)
     if asset is not None or version is not None:
-        _validate_existing(
+        _resync_existing(
             asset,
             version,
             organization_id=organization_id,
             slug=slug,
             asset_id=asset_id,
             version_id=version_id,
+            name=name,
+            description=description,
+            manifest=manifest,
             manifest_digest=manifest_digest,
             artifact_key=artifact_key,
             artifact_digest=artifact_digest,
@@ -331,13 +343,16 @@ def _insert_or_validate(
         session.expire_all()
         asset = session.get(Asset, asset_id)
         version = session.get(AssetVersion, version_id)
-        _validate_existing(
+        _resync_existing(
             asset,
             version,
             organization_id=organization_id,
             slug=slug,
             asset_id=asset_id,
             version_id=version_id,
+            name=name,
+            description=description,
+            manifest=manifest,
             manifest_digest=manifest_digest,
             artifact_key=artifact_key,
             artifact_digest=artifact_digest,
@@ -345,7 +360,7 @@ def _insert_or_validate(
         return False
 
 
-def _validate_existing(
+def _resync_existing(
     asset: Asset | None,
     version: AssetVersion | None,
     *,
@@ -353,11 +368,14 @@ def _validate_existing(
     slug: str,
     asset_id: str,
     version_id: str,
+    name: str,
+    description: str,
+    manifest: dict[str, object],
     manifest_digest: str,
     artifact_key: str,
     artifact_digest: str,
 ) -> None:
-    valid = (
+    identity_ok = (
         asset is not None
         and version is not None
         and asset.id == asset_id
@@ -368,13 +386,17 @@ def _validate_existing(
         and version.organization_id == organization_id
         and version.asset_id == asset_id
         and version.version == SAMPLE_VERSION
-        and version.digest == manifest_digest
-        and version.artifact_key == artifact_key
-        and version.artifact_digest == artifact_digest
-        and version.status == "published"
-        and version.channel == "stable"
     )
-    if not valid:
+    if not identity_ok:
         raise SampleRegistrySeedInvalid(
             f"sample registry identity collision: {slug}"
         )
+    # Re-sync sample content so redeploys with updated code or fixtures stay consistent.
+    asset.name = name
+    asset.description = description
+    version.manifest_json = manifest
+    version.digest = manifest_digest
+    version.artifact_key = artifact_key
+    version.artifact_digest = artifact_digest
+    version.status = "published"
+    version.channel = "stable"

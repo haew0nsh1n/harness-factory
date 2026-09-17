@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from web.api.builds.repository import BuildJobRepository
@@ -16,6 +18,8 @@ from web.api.identity.dependencies import get_actor, require_roles
 from web.api.identity.models import Actor
 
 router = APIRouter(prefix="/api", tags=["builds"])
+
+ARTIFACT_STREAM_CHUNK_BYTES = 256 * 1024
 
 
 def get_build_service(
@@ -76,3 +80,45 @@ def get_build(
     if build is None:
         raise HTTPException(status_code=404, detail="build not found")
     return {"ok": True, "build": to_build_response(build).model_dump(mode="json")}
+
+
+@router.get("/designs/{design_id}/builds")
+def list_design_builds(
+    design_id: str,
+    actor: Actor = Depends(get_actor),
+    service: BuildService = Depends(get_build_service),
+) -> dict[str, object]:
+    builds = service.list_recent(actor.organization_id, design_id, limit=3)
+    if builds is None:
+        raise HTTPException(status_code=404, detail="design not found")
+    return {
+        "ok": True,
+        "builds": [
+            to_build_response(build).model_dump(mode="json") for build in builds
+        ],
+    }
+
+
+@router.get("/designs/{design_id}/builds/artifact")
+def download_build_artifact(
+    design_id: str,
+    actor: Actor = Depends(require_roles("author", "developer", "org-admin")),
+    service: BuildService = Depends(get_build_service),
+) -> StreamingResponse:
+    result = service.open_artifact(actor.organization_id, design_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="build artifact not found")
+    stream, filename = result
+
+    def _iter() -> Iterator[bytes]:
+        try:
+            while chunk := stream.read(ARTIFACT_STREAM_CHUNK_BYTES):
+                yield chunk
+        finally:
+            stream.close()
+
+    return StreamingResponse(
+        _iter(),
+        media_type="application/x-tar",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

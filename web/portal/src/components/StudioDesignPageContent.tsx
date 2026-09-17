@@ -5,7 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { JsonEditor } from "@/components/JsonEditor";
 import { RegistryPublishPanel } from "@/components/RegistryPublishPanel";
 import { StatusBadge } from "@/components/StatusBadge";
+import { AgentFlowPanel } from "@/components/studio/AgentFlowPanel";
+import { BuildVersionList } from "@/components/studio/BuildVersionList";
 import { DebugJsonDisclosure } from "@/components/studio/DebugJsonDisclosure";
+import { DesignLifecycle } from "@/components/studio/DesignLifecycle";
 import {
   InterviewWorkspace,
   type EvidenceItem,
@@ -13,6 +16,7 @@ import {
 import {
   StructuredDesignEditors,
   type DesignDocuments,
+  type DesignDocumentKey,
 } from "@/components/studio/StructuredDesignEditors";
 import { type TranslateFn } from "@/i18n/dictionaries";
 import { useTranslations } from "@/i18n/I18nProvider";
@@ -38,6 +42,26 @@ interface DraftDocuments {
 type DraftDocumentField = keyof DraftDocuments;
 type DraftDocumentErrors = Partial<Record<DraftDocumentField, string>>;
 
+type StudioTabKey =
+  | "evidence"
+  | DesignDocumentKey
+  | "agent"
+  | "publish"
+  | "build"
+  | "debug";
+
+const STUDIO_TABS: ReadonlyArray<{ key: StudioTabKey; labelKey: string }> = [
+  { key: "evidence", labelKey: "studioDesign.tabEvidence" },
+  { key: "profile", labelKey: "studioDesign.tabProfile" },
+  { key: "workflow", labelKey: "studioDesign.tabWorkflow" },
+  { key: "scenarios", labelKey: "studioDesign.tabScenarios" },
+  { key: "agent", labelKey: "studioDesign.tabAgent" },
+  { key: "catalog", labelKey: "studioDesign.tabCatalog" },
+  { key: "build", labelKey: "studioDesign.tabBuild" },
+  { key: "publish", labelKey: "studioDesign.tabPublish" },
+  { key: "debug", labelKey: "studioDesign.tabDebug" },
+];
+
 function prettyJson(value: Record<string, unknown>): string {
   return JSON.stringify(value, null, 2);
 }
@@ -62,18 +86,6 @@ function buildStatusFromDesign(status: DesignStatus): string | null {
     default:
       return null;
   }
-}
-
-function canValidate(status: DesignStatus): boolean {
-  return status === "draft";
-}
-
-function canReview(status: DesignStatus): boolean {
-  return status === "validated";
-}
-
-function canBuild(status: DesignStatus): boolean {
-  return ["approved", "built", "failed"].includes(status);
 }
 
 function formatFinding(findings: ValidationFinding[] | null): string[] {
@@ -251,6 +263,8 @@ export function StudioDesignPageContent({
   const [design, setDesign] = useState<HarnessDesign | null>(null);
   const [documents, setDocuments] = useState<DraftDocuments | null>(null);
   const [build, setBuild] = useState<BuildJob | null>(null);
+  const [builds, setBuilds] = useState<BuildJob[]>([]);
+  const [activeTab, setActiveTab] = useState<StudioTabKey>("profile");
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -289,6 +303,20 @@ export function StudioDesignPageContent({
             }
           } catch {
             // The saved snapshot remains visible; saves still use the server-owned snapshot.
+          }
+          try {
+            const recent = await api<BuildJob[]>(`/designs/${designId}/builds`);
+            if (active) {
+              setBuilds(recent);
+              const current =
+                recent.find((item) => item.design_digest === loaded.digest) ??
+                recent[0];
+              if (current) {
+                setBuild(current);
+              }
+            }
+          } catch {
+            // Recent build versions are best-effort; artifact download still works.
           }
         }
       } catch (cause) {
@@ -345,6 +373,19 @@ export function StudioDesignPageContent({
     () => (design ? evidenceFromProfile(design.profile) : []),
     [design],
   );
+  const sdlcStages = useMemo(() => {
+    const sdlc = design?.profile?.sdlc;
+    if (!Array.isArray(sdlc)) {
+      return [];
+    }
+    return sdlc.flatMap((entry) =>
+      entry &&
+      typeof entry === "object" &&
+      typeof (entry as { stage?: unknown }).stage === "string"
+        ? [(entry as { stage: string }).stage]
+        : [],
+    );
+  }, [design]);
   const structuredDocuments = useMemo<DesignDocuments | null>(() => {
     if (!documents) {
       return null;
@@ -549,6 +590,10 @@ export function StudioDesignPageContent({
         },
       });
       setBuild(queued);
+      setBuilds((current) => [
+        queued,
+        ...current.filter((item) => item.id !== queued.id),
+      ]);
       setDesign((current) =>
         current ? { ...current, status: "build-queued" } : current,
       );
@@ -583,6 +628,31 @@ export function StudioDesignPageContent({
     );
   }
 
+  const renderDocumentTab = (only: DesignDocumentKey) => {
+    if (!displayedStructuredDocuments) {
+      return null;
+    }
+    return (
+      <StructuredDesignEditors
+        documents={displayedStructuredDocuments}
+        authoritativeCatalog={authoritativeCatalog}
+        findings={mappedFindings}
+        errors={structuredErrors}
+        only={only}
+        onTransientStateChange={setTransientFormState}
+        onChange={(next) => {
+          setDocuments({
+            profile: prettyJson(next.profile),
+            workflow: prettyJson(next.workflow),
+            scenarios: prettyJson(next.scenarios),
+            catalog: documents.catalog,
+          });
+          setStatusMessage(t("studioDesign.unsavedChanges"));
+        }}
+      />
+    );
+  };
+
   return (
     <div className="page-stack">
       <section className="workspace-panel design-hero">
@@ -602,48 +672,15 @@ export function StudioDesignPageContent({
           <span>{t("studioDesign.currentDigest")}</span>
           <code className="digest-text">{design.digest}</code>
         </div>
-        <div className="actions-row">
-          <button
-            className="button-primary"
-            type="button"
-            onClick={() => void saveDraft()}
-            disabled={saving}
-          >
-            {t("studioDesign.saveDraftBtn")}
-          </button>
-          <button
-            className="button-secondary"
-            type="button"
-            onClick={() => void validateDesign()}
-            disabled={saving || !canValidate(design.status)}
-          >
-            {t("studioDesign.validateBtn")}
-          </button>
-          <button
-            className="button-secondary"
-            type="button"
-            onClick={() => void reviewDesign("approved")}
-            disabled={saving || !canReview(design.status)}
-          >
-            {t("studioDesign.approveDigestBtn")}
-          </button>
-          <button
-            className="button-secondary"
-            type="button"
-            onClick={() => void reviewDesign("rejected")}
-            disabled={saving || !canReview(design.status)}
-          >
-            {t("studioDesign.rejectReviewBtn")}
-          </button>
-          <button
-            className="button-secondary"
-            type="button"
-            onClick={() => void queueBuild()}
-            disabled={saving || !canBuild(design.status)}
-          >
-            {t("studioDesign.requestBuildBtn")}
-          </button>
-        </div>
+        <DesignLifecycle
+          status={design.status}
+          saving={saving}
+          onSaveDraft={() => void saveDraft()}
+          onValidate={() => void validateDesign()}
+          onApprove={() => void reviewDesign("approved")}
+          onReject={() => void reviewDesign("rejected")}
+          onBuild={() => void queueBuild()}
+        />
         {error ? <p className="error-text">{error}</p> : null}
         {staleConflict ? (
           <div className="conflict-actions">
@@ -664,127 +701,237 @@ export function StudioDesignPageContent({
         ) : null}
       </section>
 
-      <InterviewWorkspace
-        title={t("studioDesign.evidenceTitle", { name: design.name })}
-        stage="unavailable"
-        evidence={profileEvidence}
-        conversation={
-          <div className="unavailable-state">
-            <p className="eyebrow">{t("studioDesign.interviewStatusEyebrow")}</p>
-            <h3>{t("studioDesign.interviewUnavailableTitle")}</h3>
-            <p>{t("studioDesign.interviewUnavailableBody")}</p>
-          </div>
-        }
-        composer={
-          <div className="composer-boundary" aria-disabled="true">
-            <strong>{t("studioDesign.composerDisabledTitle")}</strong>
-            <span>{t("studioDesign.composerDisabledBody")}</span>
-          </div>
-        }
-      />
+      <div
+        className="workspace-tabs studio-tabs"
+        role="tablist"
+        aria-label={t("studioDesign.tabsAria")}
+      >
+        {STUDIO_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            role="tab"
+            id={`studio-tab-${tab.key}`}
+            aria-selected={activeTab === tab.key}
+            aria-controls={`studio-panel-${tab.key}`}
+            tabIndex={activeTab === tab.key ? 0 : -1}
+            onClick={() => setActiveTab(tab.key)}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") {
+                return;
+              }
+              event.preventDefault();
+              const index = STUDIO_TABS.findIndex((entry) => entry.key === activeTab);
+              const delta = event.key === "ArrowRight" ? 1 : -1;
+              const next =
+                STUDIO_TABS[(index + delta + STUDIO_TABS.length) % STUDIO_TABS.length];
+              if (next) {
+                setActiveTab(next.key);
+              }
+            }}
+          >
+            {t(tab.labelKey)}
+          </button>
+        ))}
+      </div>
 
       {!structuredDocuments ? (
         <section className="workspace-panel" role="alert">
           <p className="error-text">{t("studioDesign.structuredError")}</p>
         </section>
       ) : null}
-      {displayedStructuredDocuments ? (
-        <div hidden={!structuredDocuments}>
-          <StructuredDesignEditors
-            documents={displayedStructuredDocuments}
-            authoritativeCatalog={authoritativeCatalog}
-            findings={mappedFindings}
-            errors={structuredErrors}
-            onTransientStateChange={setTransientFormState}
-            onChange={(next) => {
-              setDocuments({
-                profile: prettyJson(next.profile),
-                workflow: prettyJson(next.workflow),
-                scenarios: prettyJson(next.scenarios),
-                catalog: documents.catalog,
-              });
-              setStatusMessage(t("studioDesign.unsavedChanges"));
-            }}
-          />
+
+      <div
+        role="tabpanel"
+        id="studio-panel-evidence"
+        aria-labelledby="studio-tab-evidence"
+        className="studio-tabpanel"
+        hidden={activeTab !== "evidence"}
+      >
+        <InterviewWorkspace
+          title={t("studioDesign.evidenceTitle", { name: design.name })}
+          stage="unavailable"
+          stageHighlight={sdlcStages}
+          evidence={profileEvidence}
+          conversation={
+            <div className="unavailable-state">
+              <p className="eyebrow">{t("studioDesign.interviewStatusEyebrow")}</p>
+              <h3>{t("studioDesign.interviewUnavailableTitle")}</h3>
+              <p>{t("studioDesign.interviewUnavailableBody")}</p>
+            </div>
+          }
+          composer={
+            <div className="composer-boundary" aria-disabled="true">
+              <strong>{t("studioDesign.composerDisabledTitle")}</strong>
+              <span>{t("studioDesign.composerDisabledBody")}</span>
+            </div>
+          }
+        />
+      </div>
+
+      <div
+        role="tabpanel"
+        id="studio-panel-profile"
+        aria-labelledby="studio-tab-profile"
+        className="studio-tabpanel"
+        hidden={activeTab !== "profile"}
+      >
+        {renderDocumentTab("profile")}
+      </div>
+      <div
+        role="tabpanel"
+        id="studio-panel-workflow"
+        aria-labelledby="studio-tab-workflow"
+        className="studio-tabpanel"
+        hidden={activeTab !== "workflow"}
+      >
+        {renderDocumentTab("workflow")}
+      </div>
+      <div
+        role="tabpanel"
+        id="studio-panel-scenarios"
+        aria-labelledby="studio-tab-scenarios"
+        className="studio-tabpanel"
+        hidden={activeTab !== "scenarios"}
+      >
+        {renderDocumentTab("scenarios")}
+      </div>
+      <div
+        role="tabpanel"
+        id="studio-panel-agent"
+        aria-labelledby="studio-tab-agent"
+        className="studio-tabpanel"
+        hidden={activeTab !== "agent"}
+      >
+        <AgentFlowPanel
+          workflow={displayedStructuredDocuments?.workflow ?? null}
+          scenarios={displayedStructuredDocuments?.scenarios ?? null}
+        />
+      </div>
+      <div
+        role="tabpanel"
+        id="studio-panel-catalog"
+        aria-labelledby="studio-tab-catalog"
+        className="studio-tabpanel"
+        hidden={activeTab !== "catalog"}
+      >
+        {renderDocumentTab("catalog")}
+      </div>
+
+      {activeTab === "publish" ? (
+        <div
+          role="tabpanel"
+          id="studio-panel-publish"
+          aria-labelledby="studio-tab-publish"
+          className="studio-tabpanel"
+        >
+          <RegistryPublishPanel design={design} />
         </div>
       ) : null}
 
-      <div className="detail-grid">
-      <section className="workspace-panel">
-        <p className="eyebrow">{t("studioDesign.buildEyebrow")}</p>
-        <h2>{t("studioDesign.buildStatusHeading")}</h2>
-        <p>
-          {buildStatus ? (
-            <StatusBadge label={buildStatus} />
-          ) : (
-            t("studioDesign.noBuild")
-          )}
-        </p>
-        {build?.artifact_digest ? (
-          <p className="digest-text">{build.artifact_digest}</p>
-        ) : null}
-      </section>
+      <div
+        role="tabpanel"
+        id="studio-panel-build"
+        aria-labelledby="studio-tab-build"
+        className="studio-tabpanel"
+        hidden={activeTab !== "build"}
+      >
+        <div className="detail-grid">
+          <section className="workspace-panel">
+            <p className="eyebrow">{t("studioDesign.buildEyebrow")}</p>
+            <h2>{t("studioDesign.buildStatusHeading")}</h2>
+            <p>
+              {buildStatus ? (
+                <StatusBadge label={buildStatus} />
+              ) : (
+                t("studioDesign.noBuild")
+              )}
+            </p>
+            {build?.artifact_digest ? (
+              <p className="digest-text">{build.artifact_digest}</p>
+            ) : null}
+            {buildStatus === "succeeded" ? (
+              <p>
+                <a
+                  className="download-link"
+                  href={`/api/control-plane/designs/${design.id}/builds/artifact`}
+                  download
+                >
+                  {t("studioDesign.downloadArtifact")}
+                </a>
+              </p>
+            ) : null}
+          </section>
 
-      <section className="workspace-panel">
-        <p className="eyebrow">{t("studioDesign.serverValidationEyebrow")}</p>
-        <h2>{t("studioDesign.validationResults")}</h2>
-        {rawFindings.length === 0 ? (
-          <p className="muted">{t("studioDesign.noFindings")}</p>
-        ) : (
-          <div className="finding-list">
-            {rawFindings.map((finding) => (
-              <pre key={finding} className="finding-text">
-                {finding}
-              </pre>
-            ))}
-          </div>
-        )}
-      </section>
+          <BuildVersionList builds={builds} />
+
+          <section className="workspace-panel">
+            <p className="eyebrow">{t("studioDesign.serverValidationEyebrow")}</p>
+            <h2>{t("studioDesign.validationResults")}</h2>
+            {rawFindings.length === 0 ? (
+              <p className="muted">{t("studioDesign.noFindings")}</p>
+            ) : (
+              <div className="finding-list">
+                {rawFindings.map((finding) => (
+                  <pre key={finding} className="finding-text">
+                    {finding}
+                  </pre>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       </div>
 
-      <RegistryPublishPanel design={design} />
-
-      <DebugJsonDisclosure
-        label={t("studioDesign.debugLabel")}
-        hint={t("studioDesign.debugHint")}
-        errors={(Object.keys(visibleDocumentErrors) as DraftDocumentField[]).flatMap(
-          (field) => visibleDocumentErrors[field] ? [visibleDocumentErrors[field]] : [],
-        )}
-        focusTargetLabel={
-          (Object.keys(visibleDocumentErrors) as DraftDocumentField[])
-            .map((field) => visibleDocumentErrors[field] ? t(fieldLabelKey(field)) : null)
-            .find((label): label is string => label !== null)
-        }
+      <div
+        role="tabpanel"
+        id="studio-panel-debug"
+        aria-labelledby="studio-tab-debug"
+        className="studio-tabpanel"
+        hidden={activeTab !== "debug"}
       >
-        <JsonEditor
-          label="Profile"
-          value={structuredDocuments?.profile ?? design.profile}
-          textValue={documents.profile}
-          onChange={(value) => updateDocument("profile", value)}
-          errorMessage={visibleDocumentErrors.profile}
-        />
-        <JsonEditor
-          label="Workflow"
-          value={structuredDocuments?.workflow ?? design.workflow}
-          textValue={documents.workflow}
-          onChange={(value) => updateDocument("workflow", value)}
-          errorMessage={visibleDocumentErrors.workflow}
-        />
-        <JsonEditor
-          label="Scenarios"
-          value={structuredDocuments?.scenarios ?? design.scenarios}
-          textValue={documents.scenarios}
-          onChange={(value) => updateDocument("scenarios", value)}
-          errorMessage={visibleDocumentErrors.scenarios}
-        />
-        <JsonEditor
-          label="Catalog"
-          value={structuredDocuments?.catalog ?? design.catalog}
-          textValue={documents.catalog}
-          disabled
-          errorMessage={visibleDocumentErrors.catalog}
-        />
-      </DebugJsonDisclosure>
+        <DebugJsonDisclosure
+          label={t("studioDesign.debugLabel")}
+          hint={t("studioDesign.debugHint")}
+          errors={(Object.keys(visibleDocumentErrors) as DraftDocumentField[]).flatMap(
+            (field) => visibleDocumentErrors[field] ? [visibleDocumentErrors[field]] : [],
+          )}
+          focusTargetLabel={
+            (Object.keys(visibleDocumentErrors) as DraftDocumentField[])
+              .map((field) => visibleDocumentErrors[field] ? t(fieldLabelKey(field)) : null)
+              .find((label): label is string => label !== null)
+          }
+        >
+          <JsonEditor
+            label="Profile"
+            value={structuredDocuments?.profile ?? design.profile}
+            textValue={documents.profile}
+            onChange={(value) => updateDocument("profile", value)}
+            errorMessage={visibleDocumentErrors.profile}
+          />
+          <JsonEditor
+            label="Workflow"
+            value={structuredDocuments?.workflow ?? design.workflow}
+            textValue={documents.workflow}
+            onChange={(value) => updateDocument("workflow", value)}
+            errorMessage={visibleDocumentErrors.workflow}
+          />
+          <JsonEditor
+            label="Scenarios"
+            value={structuredDocuments?.scenarios ?? design.scenarios}
+            textValue={documents.scenarios}
+            onChange={(value) => updateDocument("scenarios", value)}
+            errorMessage={visibleDocumentErrors.scenarios}
+          />
+          <JsonEditor
+            label="Catalog"
+            value={structuredDocuments?.catalog ?? design.catalog}
+            textValue={documents.catalog}
+            disabled
+            errorMessage={visibleDocumentErrors.catalog}
+          />
+        </DebugJsonDisclosure>
+      </div>
     </div>
   );
 }

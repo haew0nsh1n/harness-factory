@@ -61,14 +61,20 @@ resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: 'st${resourceToken}'
   location: location
-  tags: tags
+  // SecurityControl=Ignore exempts this account from the org policy that
+  // disables public network access; the Container Apps AzureFile mount needs it.
+  tags: union(tags, {
+    SecurityControl: 'Ignore'
+  })
   sku: {
     name: 'Standard_LRS'
   }
   kind: 'StorageV2'
   properties: {
     allowBlobPublicAccess: false
+    allowSharedKeyAccess: true
     minimumTlsVersion: 'TLS1_2'
+    publicNetworkAccess: 'Enabled'
   }
 }
 
@@ -230,6 +236,8 @@ module api 'container-app.bicep' = {
     env: concat(backendEnv, openAiEnv)
     secrets: backendSecrets
     command: apiCommand
+    volumes: artifactVolumes
+    volumeMounts: artifactMounts
     minReplicas: 1
     maxReplicas: 1
   }
@@ -251,6 +259,8 @@ module worker 'container-app.bicep' = {
     env: concat(backendEnv, openAiEnv)
     secrets: backendSecrets
     command: workerCommand
+    volumes: artifactVolumes
+    volumeMounts: artifactMounts
     minReplicas: 1
     maxReplicas: 1
   }

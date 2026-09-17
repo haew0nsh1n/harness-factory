@@ -13,6 +13,7 @@ import {
   objectRows,
   replaceRow,
 } from "@/components/studio/DesignFormFields";
+import { FlowEditor } from "@/components/studio/FlowEditor";
 import {
   analyzeDependencies,
   isJsonDocument,
@@ -91,57 +92,69 @@ export function WorkflowForm({
       <StringListField label={t("workflowForm.outputs")} value={document.outputs} error={errors["workflow.outputs"]} onChange={(value) => onChange(updateDocumentField(document, "outputs", value))} />
       <StringListField label={t("workflowForm.customerRules")} value={document.customer_rules} error={errors["workflow.customer_rules"]} onChange={(value) => onChange(updateDocumentField(document, "customer_rules", value))} />
 
-      <ObjectListSection title={t("workflowForm.stepsSection")} error={errors["workflow.steps"]} onAdd={() => onChange(updateDocumentField(document, "steps", appendRow(document.steps, { id: "", name: "", skill: skills[0] ?? "", needs: [], inputs: [], outputs: [], tools: [], effect: "read", approval: false, approval_timing: "before", approver: null, completion: "", failure: "", manual: null })))}>
-        {steps.map(({ value: step, originalIndex: index }) => {
+      <FlowEditor
+        title={t("workflowForm.stepsSection")}
+        ariaLabel={t("workflowForm.stepsSection")}
+        addLabel={t("formFields.addItem")}
+        error={errors["workflow.steps"]}
+        onAdd={() => onChange(updateDocumentField(document, "steps", appendRow(document.steps, { id: "", name: "", skill: skills[0] ?? "", needs: [], inputs: [], outputs: [], tools: [], effect: "read", approval: false, approval_timing: "before", approver: null, completion: "", failure: "", manual: null })))}
+        items={steps.map(({ value: step, originalIndex: index }) => {
           const id = typeof step.id === "string" && step.id ? step.id : t("workflowForm.stepFallback", { n: index + 1 });
+          const label = typeof step.name === "string" && step.name ? step.name : id;
           const manual = isJsonDocument(step.manual) ? step.manual : null;
           const updateStep = (field: string, value: unknown) =>
             onChange(updateDocumentField(document, "steps", replaceRow(document.steps, index, updateDocumentField(step, field, value))));
-          return (
-            <NestedCard key={`step-${index}`} title={t("workflowForm.stepCard", { id })} removeLabel={t("workflowForm.stepRemove", { id })} onRemove={() => onChange(updateDocumentField(document, "steps", removeRow(document.steps, index)))}>
-              <div className="form-grid">
-                <TextField label={t("workflowForm.stepId", { id })} value={step.id} error={errors[`workflow.steps.${index}.id`]} onChange={(value) => updateStep("id", value)} />
-                <TextField label={t("workflowForm.stepName", { id })} value={step.name} error={errors[`workflow.steps.${index}.name`]} onChange={(value) => updateStep("name", value)} />
-                <SelectField label={t("workflowForm.stepSkill", { id })} value={step.skill} options={skills} error={errors[`workflow.steps.${index}.skill`]} onChange={(value) => updateStep("skill", value)} />
-                <SelectField label={t("workflowForm.stepEffect", { id })} value={step.effect} options={EFFECTS} error={errors[`workflow.steps.${index}.effect`]} onChange={(value) => updateStep("effect", value)} />
-              </div>
-              <StringListField label={t("workflowForm.stepNeeds", { id })} value={step.needs} error={errors[`workflow.steps.${index}.needs`]} onChange={(value) => updateStep("needs", value)} />
-              <StringListField label={t("workflowForm.stepInputs", { id })} value={step.inputs} error={errors[`workflow.steps.${index}.inputs`]} onChange={(value) => updateStep("inputs", value)} />
-              <StringListField label={t("workflowForm.stepOutputs", { id })} value={step.outputs} error={errors[`workflow.steps.${index}.outputs`]} onChange={(value) => updateStep("outputs", value)} />
-              <StringListField label={t("workflowForm.stepTools", { id })} value={step.tools} error={errors[`workflow.steps.${index}.tools`]} onChange={(value) => updateStep("tools", value)} />
-              <label className="choice-control">
-                <input type="checkbox" checked={step.approval === true} onChange={(event) => updateStep("approval", event.target.checked)} />
-                <span>{t("workflowForm.stepApprovalNeeded", { id })}</span>
-              </label>
-              {errors[`workflow.steps.${index}.approval`] ? <p className="field-error">{errors[`workflow.steps.${index}.approval`]}</p> : null}
-              <div className="form-grid">
-                <SelectField label={t("workflowForm.stepApprovalTiming", { id })} value={step.approval_timing ?? "before"} options={APPROVAL_TIMINGS} error={errors[`workflow.steps.${index}.approval_timing`]} onChange={(value) => updateStep("approval_timing", value)} />
-                <SelectField label={t("workflowForm.stepApprovalRole", { id })} value={step.approver ?? ""} options={["", ...roles]} error={errors[`workflow.steps.${index}.approver`]} onChange={(value) => updateStep("approver", value || null)} />
-              </div>
-              <TextField multiline label={t("workflowForm.stepCompletion", { id })} value={step.completion} error={errors[`workflow.steps.${index}.completion`]} onChange={(value) => updateStep("completion", value)} />
-              <TextField multiline label={t("workflowForm.stepFailure", { id })} value={step.failure} error={errors[`workflow.steps.${index}.failure`]} onChange={(value) => updateStep("failure", value)} />
-              <label className="choice-control">
-                <input type="checkbox" checked={manual !== null} onChange={(event) => updateStep("manual", event.target.checked ? { owner: "", instructions: "", resume_when: "" } : null)} />
-                <span>{t("workflowForm.stepManualHandoff", { id })}</span>
-              </label>
-              {errors[`workflow.steps.${index}.manual`] ? <p className="field-error">{errors[`workflow.steps.${index}.manual`]}</p> : null}
-              {manual ? (
+          return {
+            key: `step-${index}`,
+            label,
+            removeLabel: t("workflowForm.stepRemove", { id }),
+            onRemove: () => onChange(updateDocumentField(document, "steps", removeRow(document.steps, index))),
+            content: (
+              <>
                 <div className="form-grid">
-                  <SelectField label={t("workflowForm.manualOwner", { id })} value={manual.owner} options={roles} error={errors[`workflow.steps.${index}.manual.owner`]} onChange={(value) => updateStep("manual", updateDocumentField(manual, "owner", value))} />
-                  <TextField multiline label={t("workflowForm.manualInstructions", { id })} value={manual.instructions} error={errors[`workflow.steps.${index}.manual.instructions`]} onChange={(value) => updateStep("manual", updateDocumentField(manual, "instructions", value))} />
-                  <TextField multiline label={t("workflowForm.manualResume", { id })} value={manual.resume_when} error={errors[`workflow.steps.${index}.manual.resume_when`]} onChange={(value) => updateStep("manual", updateDocumentField(manual, "resume_when", value))} />
+                  <TextField label={t("workflowForm.stepId", { id })} value={step.id} error={errors[`workflow.steps.${index}.id`]} onChange={(value) => updateStep("id", value)} />
+                  <TextField label={t("workflowForm.stepName", { id })} value={step.name} error={errors[`workflow.steps.${index}.name`]} onChange={(value) => updateStep("name", value)} />
+                  <SelectField label={t("workflowForm.stepSkill", { id })} value={step.skill} options={skills} error={errors[`workflow.steps.${index}.skill`]} onChange={(value) => updateStep("skill", value)} />
+                  <SelectField label={t("workflowForm.stepEffect", { id })} value={step.effect} options={EFFECTS} error={errors[`workflow.steps.${index}.effect`]} onChange={(value) => updateStep("effect", value)} />
                 </div>
-              ) : null}
-            </NestedCard>
-          );
+                <StringListField label={t("workflowForm.stepNeeds", { id })} value={step.needs} error={errors[`workflow.steps.${index}.needs`]} onChange={(value) => updateStep("needs", value)} />
+                <StringListField label={t("workflowForm.stepInputs", { id })} value={step.inputs} error={errors[`workflow.steps.${index}.inputs`]} onChange={(value) => updateStep("inputs", value)} />
+                <StringListField label={t("workflowForm.stepOutputs", { id })} value={step.outputs} error={errors[`workflow.steps.${index}.outputs`]} onChange={(value) => updateStep("outputs", value)} />
+                <StringListField label={t("workflowForm.stepTools", { id })} value={step.tools} error={errors[`workflow.steps.${index}.tools`]} onChange={(value) => updateStep("tools", value)} />
+                <label className="choice-control">
+                  <input type="checkbox" checked={step.approval === true} onChange={(event) => updateStep("approval", event.target.checked)} />
+                  <span>{t("workflowForm.stepApprovalNeeded", { id })}</span>
+                </label>
+                {errors[`workflow.steps.${index}.approval`] ? <p className="field-error">{errors[`workflow.steps.${index}.approval`]}</p> : null}
+                <div className="form-grid">
+                  <SelectField label={t("workflowForm.stepApprovalTiming", { id })} value={step.approval_timing ?? "before"} options={APPROVAL_TIMINGS} error={errors[`workflow.steps.${index}.approval_timing`]} onChange={(value) => updateStep("approval_timing", value)} />
+                  <SelectField label={t("workflowForm.stepApprovalRole", { id })} value={step.approver ?? ""} options={["", ...roles]} error={errors[`workflow.steps.${index}.approver`]} onChange={(value) => updateStep("approver", value || null)} />
+                </div>
+                <TextField multiline label={t("workflowForm.stepCompletion", { id })} value={step.completion} error={errors[`workflow.steps.${index}.completion`]} onChange={(value) => updateStep("completion", value)} />
+                <TextField multiline label={t("workflowForm.stepFailure", { id })} value={step.failure} error={errors[`workflow.steps.${index}.failure`]} onChange={(value) => updateStep("failure", value)} />
+                <label className="choice-control">
+                  <input type="checkbox" checked={manual !== null} onChange={(event) => updateStep("manual", event.target.checked ? { owner: "", instructions: "", resume_when: "" } : null)} />
+                  <span>{t("workflowForm.stepManualHandoff", { id })}</span>
+                </label>
+                {errors[`workflow.steps.${index}.manual`] ? <p className="field-error">{errors[`workflow.steps.${index}.manual`]}</p> : null}
+                {manual ? (
+                  <div className="form-grid">
+                    <SelectField label={t("workflowForm.manualOwner", { id })} value={manual.owner} options={roles} error={errors[`workflow.steps.${index}.manual.owner`]} onChange={(value) => updateStep("manual", updateDocumentField(manual, "owner", value))} />
+                    <TextField multiline label={t("workflowForm.manualInstructions", { id })} value={manual.instructions} error={errors[`workflow.steps.${index}.manual.instructions`]} onChange={(value) => updateStep("manual", updateDocumentField(manual, "instructions", value))} />
+                    <TextField multiline label={t("workflowForm.manualResume", { id })} value={manual.resume_when} error={errors[`workflow.steps.${index}.manual.resume_when`]} onChange={(value) => updateStep("manual", updateDocumentField(manual, "resume_when", value))} />
+                  </div>
+                ) : null}
+              </>
+            ),
+          };
         })}
-      </ObjectListSection>
+      />
 
       <section className="dependency-preview" aria-label={t("workflowForm.dependencyAria")}>
         <strong>{t("workflowForm.dependencyTitle")}</strong>
-        {analysis.edges.length === 0 ? <p className="muted">{t("workflowForm.noEdges")}</p> : (
-          <ul>{analysis.edges.map((edge, index) => <li key={`${edge.from}-${edge.to}-${index}`}><code>{edge.from}</code> → <code>{edge.to}</code></li>)}</ul>
-        )}
+        {analysis.missing.length === 0 && analysis.cycles.length === 0 ? (
+          <p className="muted">{t("workflowForm.dependencyOk")}</p>
+        ) : null}
         {analysis.missing.map((item) => <p className="error-text" key={`${item.stepId}-${item.dependencyId}`}>{t("workflowForm.missingNode", { stepId: item.stepId, dependencyId: item.dependencyId })}</p>)}
         {analysis.cycles.map((cycle) => <p className="error-text" key={cycle.join("-")}>{t("workflowForm.cycle", { cycle: cycle.join(" → ") })}</p>)}
       </section>

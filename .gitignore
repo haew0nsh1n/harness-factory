@@ -33,6 +33,9 @@ eggs/
 .eggs/
 lib/
 lib64/
+# The portal ships its client library here; keep it out of the generic lib/ ignore.
+!web/portal/src/lib/
+!web/portal/src/lib/**
 parts/
 sdist/
 var/

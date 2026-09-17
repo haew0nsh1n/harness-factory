@@ -20,6 +20,8 @@ export interface DesignDocuments {
   catalog: JsonDocument;
 }
 
+export type DesignDocumentKey = keyof DesignDocuments;
+
 interface StructuredDesignEditorsProps {
   documents: DesignDocuments;
   authoritativeCatalog: JsonDocument | null;
@@ -27,17 +29,47 @@ interface StructuredDesignEditorsProps {
   errors?: DesignFormErrors;
   findings?: string[];
   readOnly?: boolean;
+  // Render only one document's editor (for the tabbed studio layout).
+  only?: DesignDocumentKey;
   onTransientStateChange?: (state: {
     dirty: boolean;
     errors: DesignFormErrors;
   }) => void;
 }
 
+const ADVISORY_FINDING_CODES = new Set([
+  "unconfirmed-model-fact",
+  "unconfirmed-fact",
+  "scope-confirmation-required",
+  "scope-not-selected",
+  "scope-mismatch",
+]);
+
+function findingParts(finding: string): {
+  path: string;
+  code: string;
+  message: string;
+} {
+  const segments = finding.split(":");
+  return {
+    path: (segments[0] ?? "").trim(),
+    code: (segments[1] ?? "").trim(),
+    message: segments.slice(2).join(":").trim(),
+  };
+}
+
+function isAdvisoryFinding(finding: string): boolean {
+  return ADVISORY_FINDING_CODES.has(findingParts(finding).code);
+}
+
+// Drop the repeated "path:" prefix so a section does not restate it per line.
+function findingDisplay(finding: string): string {
+  const { code, message } = findingParts(finding);
+  return code ? `${code}: ${message}` : message;
+}
+
 function documentFindings(findings: string[], prefix: string): string[] {
-  return findings.filter((finding) => {
-    const path = finding.split(":", 1)[0]?.trim();
-    return path === prefix;
-  });
+  return findings.filter((finding) => findingParts(finding).path === prefix);
 }
 
 function findingsByKnownPath(
@@ -46,9 +78,10 @@ function findingsByKnownPath(
 ): DesignFormErrors {
   const result = { ...errors };
   findings.forEach((finding) => {
-    const path = finding.split(":", 1)[0]?.trim();
+    const { path } = findingParts(finding);
     if (path && isKnownFormPath(path)) {
-      result[path] = result[path] ? `${result[path]} ${finding}` : finding;
+      const line = findingDisplay(finding);
+      result[path] = result[path] ? `${result[path]}\n${line}` : line;
     }
   });
   return result;
@@ -74,10 +107,33 @@ function FindingBlock({
     <div className="mapped-findings" aria-label={t("structuredEditors.findingAria", { prefix })}>
       {matches.map((finding) => (
         <pre className="finding-text" key={finding}>
-          {finding}
+          {findingDisplay(finding)}
         </pre>
       ))}
     </div>
+  );
+}
+
+function AdvisoryNotes({ findings }: { findings: string[] }) {
+  const t = useTranslations();
+  if (findings.length === 0) {
+    return null;
+  }
+  return (
+    <section
+      className="workspace-panel advisory-notes"
+      aria-label={t("structuredEditors.advisoryNotes")}
+    >
+      <p className="eyebrow">{t("structuredEditors.advisoryNotes")}</p>
+      <p className="muted">{t("structuredEditors.advisoryHint")}</p>
+      <ul className="advisory-note-list">
+        {findings.map((finding) => (
+          <li className="advisory-note" key={finding}>
+            {findingParts(finding).message}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -112,6 +168,7 @@ export function StructuredDesignEditors({
   errors: suppliedErrors,
   findings = [],
   readOnly = false,
+  only,
   onTransientStateChange,
 }: StructuredDesignEditorsProps) {
   const t = useTranslations();
@@ -125,9 +182,17 @@ export function StructuredDesignEditors({
     [authoritativeCatalog, documents, t],
   );
   const errors = suppliedErrors ?? computedErrors;
+  const advisoryFindings = useMemo(
+    () => findings.filter(isAdvisoryFinding),
+    [findings],
+  );
+  const actionableFindings = useMemo(
+    () => findings.filter((finding) => !isAdvisoryFinding(finding)),
+    [findings],
+  );
   const displayedErrors = useMemo(
-    () => findingsByKnownPath(findings, errors),
-    [errors, findings],
+    () => findingsByKnownPath(actionableFindings, errors),
+    [errors, actionableFindings],
   );
 
   if (readOnly) {
@@ -141,12 +206,13 @@ export function StructuredDesignEditors({
           <ReadOnlyDocument label={t("structuredEditors.scenarios")} document={documents.scenarios} />
           <ReadOnlyDocument label={t("structuredEditors.approvalCatalog")} document={documents.catalog} />
         </DebugJsonDisclosure>
-        {findings.length > 0 ? (
+        <AdvisoryNotes findings={advisoryFindings} />
+        {actionableFindings.length > 0 ? (
           <section className="workspace-panel" aria-label={t("structuredEditors.rawFindings")}>
             <p className="eyebrow">{t("structuredEditors.rawFindings")}</p>
-            {findings.map((finding) => (
+            {actionableFindings.map((finding) => (
               <pre className="finding-text" key={finding}>
-                {finding}
+                {findingDisplay(finding)}
               </pre>
             ))}
           </section>
@@ -155,8 +221,8 @@ export function StructuredDesignEditors({
     );
   }
 
-  const unplacedFindings = findings.filter((finding) => {
-    const path = finding.split(":", 1)[0]?.trim();
+  const unplacedFindings = actionableFindings.filter((finding) => {
+    const { path } = findingParts(finding);
     return (
       path !== "profile" &&
       path !== "workflow" &&
@@ -166,56 +232,80 @@ export function StructuredDesignEditors({
     );
   });
 
+  const shows = (key: DesignDocumentKey) => !only || only === key;
+  const advisoryForView = only
+    ? advisoryFindings.filter((finding) =>
+        findingParts(finding).path.startsWith(only),
+      )
+    : advisoryFindings;
+
   return (
     <div className="structured-editors">
-      <FindingBlock findings={findings} prefix="profile" />
-      <ProfileForm
-        document={documents.profile}
-        errors={displayedErrors}
-        onChange={(profile) => onChange({ ...documents, profile })}
-        onTransientStateChange={onTransientStateChange}
-      />
-      <FindingBlock findings={findings} prefix="workflow" />
-      <WorkflowForm
-        document={documents.workflow}
-        profile={documents.profile}
-        catalog={authoritativeCatalog}
-        errors={displayedErrors}
-        onChange={(workflow) => onChange({ ...documents, workflow })}
-      />
-      <FindingBlock findings={findings} prefix="scenarios" />
-      <ScenarioForm
-        document={documents.scenarios}
-        errors={displayedErrors}
-        onChange={(scenarios) => onChange({ ...documents, scenarios })}
-      />
-      <FindingBlock findings={findings} prefix="catalog" />
-      <DesignDocumentReview
-        documents={{
-          ...documents,
-          catalog: authoritativeCatalog ?? documents.catalog,
-        }}
-        documentTypes={["catalog"]}
-      />
-      <DebugJsonDisclosure
-        label={t("structuredEditors.catalogRawLabel")}
-        hint={t("structuredEditors.catalogRawHint")}
-      >
-        <ReadOnlyDocument
-          label={t("structuredEditors.currentServerCatalog")}
-          document={authoritativeCatalog ?? documents.catalog}
-        />
-        <ReadOnlyDocument
-          label={t("structuredEditors.savedCatalogSnapshot")}
-          document={documents.catalog}
-        />
-      </DebugJsonDisclosure>
-      {unplacedFindings.length > 0 ? (
+      <AdvisoryNotes findings={advisoryForView} />
+      {shows("profile") ? (
+        <>
+          <FindingBlock findings={actionableFindings} prefix="profile" />
+          <ProfileForm
+            document={documents.profile}
+            errors={displayedErrors}
+            onChange={(profile) => onChange({ ...documents, profile })}
+            onTransientStateChange={onTransientStateChange}
+          />
+        </>
+      ) : null}
+      {shows("workflow") ? (
+        <>
+          <FindingBlock findings={actionableFindings} prefix="workflow" />
+          <WorkflowForm
+            document={documents.workflow}
+            profile={documents.profile}
+            catalog={authoritativeCatalog}
+            errors={displayedErrors}
+            onChange={(workflow) => onChange({ ...documents, workflow })}
+          />
+        </>
+      ) : null}
+      {shows("scenarios") ? (
+        <>
+          <FindingBlock findings={actionableFindings} prefix="scenarios" />
+          <ScenarioForm
+            document={documents.scenarios}
+            errors={displayedErrors}
+            onChange={(scenarios) => onChange({ ...documents, scenarios })}
+          />
+        </>
+      ) : null}
+      {shows("catalog") ? (
+        <>
+          <FindingBlock findings={actionableFindings} prefix="catalog" />
+          <DesignDocumentReview
+            documents={{
+              ...documents,
+              catalog: authoritativeCatalog ?? documents.catalog,
+            }}
+            documentTypes={["catalog"]}
+          />
+          <DebugJsonDisclosure
+            label={t("structuredEditors.catalogRawLabel")}
+            hint={t("structuredEditors.catalogRawHint")}
+          >
+            <ReadOnlyDocument
+              label={t("structuredEditors.currentServerCatalog")}
+              document={authoritativeCatalog ?? documents.catalog}
+            />
+            <ReadOnlyDocument
+              label={t("structuredEditors.savedCatalogSnapshot")}
+              document={documents.catalog}
+            />
+          </DebugJsonDisclosure>
+        </>
+      ) : null}
+      {!only && unplacedFindings.length > 0 ? (
         <section className="workspace-panel" aria-label={t("structuredEditors.unmappedAria")}>
           <p className="eyebrow">{t("structuredEditors.rawFindings")}</p>
           {unplacedFindings.map((finding) => (
             <pre className="finding-text" key={finding}>
-              {finding}
+              {findingDisplay(finding)}
             </pre>
           ))}
         </section>

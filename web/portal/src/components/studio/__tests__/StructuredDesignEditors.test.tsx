@@ -168,7 +168,7 @@ describe("StructuredDesignEditors proposal review", () => {
       name: "현재 서버 승인 카탈로그 전체 JSON 검토",
     }) as HTMLTextAreaElement;
     const snapshotJson = screen.getByRole("textbox", {
-      name: "설계에 저장된 카탈로그 스냅샷 전체 JSON 검토",
+      name: "디자인에 저장된 카탈로그 스냅샷 전체 JSON 검토",
     }) as HTMLTextAreaElement;
     expect(serverJson.value).toContain("server-skill");
     expect(serverJson.value).not.toContain("snapshot-skill");

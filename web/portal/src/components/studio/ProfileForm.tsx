@@ -13,6 +13,7 @@ import {
   objectRows,
   replaceRow,
 } from "@/components/studio/DesignFormFields";
+import { FlowEditor } from "@/components/studio/FlowEditor";
 import {
   isJsonDocument,
   updateDocumentField,
@@ -199,26 +200,31 @@ export function ProfileForm({
         />
       </div>
 
-      <ObjectListSection
+      <FlowEditor
         title={t("profileForm.sdlcSection")}
+        ariaLabel={t("profileForm.sdlcSection")}
+        addLabel={t("formFields.addItem")}
         error={errors["profile.sdlc"]}
         onAdd={() =>
           onChange(updateDocumentField(document, "sdlc", appendRow(document.sdlc, { stage: "", current: "", desired: "" })))
         }
-      >
-        {sdlc.map(({ value: row, originalIndex: index }) => (
-          <NestedCard
-            key={`sdlc-${index}`}
-            title={t("profileForm.sdlcCard", { n: index + 1 })}
-            removeLabel={t("profileForm.sdlcRemove", { n: index + 1 })}
-            onRemove={() => onChange(updateDocumentField(document, "sdlc", removeRow(document.sdlc, index)))}
-          >
-            <TextField label={t("profileForm.sdlcName", { n: index + 1 })} value={row.stage} error={errors[`profile.sdlc.${index}.stage`]} onChange={(value) => onChange(updateDocumentField(document, "sdlc", replaceRow(document.sdlc, index, updateDocumentField(row, "stage", value))))} />
-            <TextField multiline label={t("profileForm.sdlcCurrent", { n: index + 1 })} value={row.current} error={errors[`profile.sdlc.${index}.current`]} onChange={(value) => onChange(updateDocumentField(document, "sdlc", replaceRow(document.sdlc, index, updateDocumentField(row, "current", value))))} />
-            <TextField multiline label={t("profileForm.sdlcDesired", { n: index + 1 })} value={row.desired} error={errors[`profile.sdlc.${index}.desired`]} onChange={(value) => onChange(updateDocumentField(document, "sdlc", replaceRow(document.sdlc, index, updateDocumentField(row, "desired", value))))} />
-          </NestedCard>
-        ))}
-      </ObjectListSection>
+        items={sdlc.map(({ value: row, originalIndex: index }) => ({
+          key: `sdlc-${index}`,
+          label:
+            typeof row.stage === "string" && row.stage
+              ? row.stage
+              : t("profileForm.sdlcCard", { n: index + 1 }),
+          removeLabel: t("profileForm.sdlcRemove", { n: index + 1 }),
+          onRemove: () => onChange(updateDocumentField(document, "sdlc", removeRow(document.sdlc, index))),
+          content: (
+            <>
+              <TextField label={t("profileForm.sdlcName", { n: index + 1 })} value={row.stage} error={errors[`profile.sdlc.${index}.stage`]} onChange={(value) => onChange(updateDocumentField(document, "sdlc", replaceRow(document.sdlc, index, updateDocumentField(row, "stage", value))))} />
+              <TextField multiline label={t("profileForm.sdlcCurrent", { n: index + 1 })} value={row.current} error={errors[`profile.sdlc.${index}.current`]} onChange={(value) => onChange(updateDocumentField(document, "sdlc", replaceRow(document.sdlc, index, updateDocumentField(row, "current", value))))} />
+              <TextField multiline label={t("profileForm.sdlcDesired", { n: index + 1 })} value={row.desired} error={errors[`profile.sdlc.${index}.desired`]} onChange={(value) => onChange(updateDocumentField(document, "sdlc", replaceRow(document.sdlc, index, updateDocumentField(row, "desired", value))))} />
+            </>
+          ),
+        }))}
+      />
 
       <ObjectListSection
         title={t("profileForm.glossarySection")}

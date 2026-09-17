@@ -108,9 +108,6 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (design.status !== "built") {
-      return;
-    }
     let active = true;
     setActor(null);
     setAssets([]);
@@ -150,12 +147,9 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaults, design.digest, design.id, design.status]);
 
-  if (design.status !== "built") {
-    return null;
-  }
-
   const slugValid = SLUG_PATTERN.test(slug);
   const versionValid = SEMVER_PATTERN.test(versionNumber);
+  const isBuilt = design.status === "built";
   const roles = new Set(actor?.roles ?? []);
   const canManageAssets = roles.has("registry-admin");
   const canAuthor = roles.has("author") || roles.has("registry-admin");
@@ -411,6 +405,11 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
         <p className="eyebrow">{t("publish.eyebrow")}</p>
         <h2>{t("publish.heading")}</h2>
         <p className={`muted ${styles.intro}`}>{t("publish.intro")}</p>
+        {!isBuilt ? (
+          <p className="save-state" role="status">
+            {t("publish.needBuiltNotice")}
+          </p>
+        ) : null}
       </div>
 
       <div className={styles.fields}>
@@ -521,7 +520,7 @@ export function RegistryPublishPanel({ design }: RegistryPublishPanelProps) {
           <button
             className="button-secondary"
             type="button"
-            disabled={busy || !asset || Boolean(version) || !versionValid || !canAuthor}
+            disabled={busy || !asset || Boolean(version) || !versionValid || !canAuthor || !isBuilt}
             onClick={() => void createVersion()}
           >
             {t("publish.createVersionBtn")}

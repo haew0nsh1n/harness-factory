@@ -84,7 +84,7 @@ def test_sample_source_fixtures_validate_against_full_catalog() -> None:
         }
 
 
-def test_seed_creates_four_draft_revision_one_designs(sample_database) -> None:
+def test_seed_creates_draft_revision_one_designs(sample_database) -> None:
     engine, factory = sample_database
     results = _seed(factory)
 
@@ -95,12 +95,13 @@ def test_seed_creates_four_draft_revision_one_designs(sample_database) -> None:
         designs = session.scalars(
             select(HarnessDesign).order_by(HarnessDesign.name)
         ).all()
-        assert len(designs) == 4
+        assert len(designs) == len(SAMPLE_TEMPLATE_KEYS)
         assert {design.name for design in designs} == {
             "이슈 명확화와 실행 계획",
             "테스트 우선 구현",
             "근거 기반 코드 리뷰",
             "리뷰 후 수동 PR 인계",
+            "전체 SDLC 딜리버리",
         }
         for design in designs:
             assert design.status == "draft"
@@ -151,7 +152,9 @@ def test_repeat_and_partial_seed_preserve_existing_edits(sample_database) -> Non
         assert edited.digest == "a" * 64
         assert edited.created_at == edited_at.replace(tzinfo=None)
         assert edited.updated_at == edited_at.replace(tzinfo=None)
-        assert session.scalar(select(func.count()).select_from(HarnessDesign)) == 4
+        assert session.scalar(select(func.count()).select_from(HarnessDesign)) == len(
+            SAMPLE_TEMPLATE_KEYS
+        )
 
 
 def test_concurrent_sqlite_seed_is_duplicate_free(sample_database) -> None:
@@ -172,9 +175,9 @@ def test_concurrent_sqlite_seed_is_duplicate_free(sample_database) -> None:
     with ThreadPoolExecutor(max_workers=2) as executor:
         outcomes = list(executor.map(lambda _: run_seed(), range(2)))
 
-    assert sum(sum(outcome) for outcome in outcomes) == 4
+    assert sum(sum(outcome) for outcome in outcomes) == 5
     with Session(engine) as session:
-        assert session.scalar(select(func.count()).select_from(HarnessDesign)) == 4
+        assert session.scalar(select(func.count()).select_from(HarnessDesign)) == 5
 
 
 def test_seed_is_tenant_isolated_and_preserves_other_data(sample_database) -> None:
@@ -218,7 +221,7 @@ def test_seed_is_tenant_isolated_and_preserves_other_data(sample_database) -> No
                 .select_from(HarnessDesign)
                 .where(HarnessDesign.organization_id == "local-dev")
             )
-            == 4
+            == 5
         )
 
 

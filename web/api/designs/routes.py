@@ -71,6 +71,18 @@ def get_design(
     return {"ok": True, "design": to_design_response(design).model_dump(mode="json")}
 
 
+@router.delete("/{design_id}")
+def delete_design(
+    design_id: str,
+    actor: Actor = Depends(require_roles("author")),
+    service: DesignService = Depends(get_design_service),
+) -> dict[str, object]:
+    deleted = service.delete(actor.organization_id, actor.subject_id, design_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="design not found")
+    return {"ok": True}
+
+
 @router.put("/{design_id}")
 def replace_design(
     design_id: str,

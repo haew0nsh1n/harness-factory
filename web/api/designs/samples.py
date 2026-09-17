@@ -23,6 +23,7 @@ SAMPLE_TEMPLATE_KEYS = (
     "test-first-implementation",
     "code-review",
     "manual-handoff",
+    "full-sdlc-delivery",
 )
 
 

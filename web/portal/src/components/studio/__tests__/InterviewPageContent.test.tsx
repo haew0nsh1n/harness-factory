@@ -261,7 +261,7 @@ describe("InterviewPageContent lifecycle", () => {
     render(<InterviewPageContent interviewId="interview-1" />);
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "설계 제안 생성" }),
+      await screen.findByRole("button", { name: "디자인 제안 생성" }),
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -374,7 +374,7 @@ describe("InterviewPageContent lifecycle", () => {
     render(<InterviewPageContent interviewId="interview-1" />);
     expect(await screen.findByRole("status")).toHaveTextContent("저장된 작업 상태를 확인");
     expect(screen.getByLabelText("답변")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "설계 제안 생성" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "디자인 제안 생성" })).toBeDisabled();
     const confirmation = screen.getByRole("button", { name: "사실 확인" });
     expect(confirmation).toBeDisabled();
     fireEvent.click(confirmation);
@@ -469,7 +469,7 @@ describe("InterviewPageContent lifecycle", () => {
       screen.queryByRole("button", { name: "저장된 요청 다시 시도" }),
     ).not.toBeInTheDocument();
     const generateButton = screen.getByRole("button", {
-      name: "설계 제안 생성",
+      name: "디자인 제안 생성",
     });
     expect(generateButton).toBeEnabled();
     fireEvent.click(generateButton);
@@ -813,7 +813,7 @@ describe("InterviewPageContent lifecycle", () => {
     fireEvent.click(screen.getByRole("button", { name: "정확한 제안 적용" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "대상 설계가 검토 후 변경되었습니다",
+      "대상 디자인이 검토 후 변경되었습니다",
     );
     expect(applyBody).toMatchObject({
       expected_revision: 3,
@@ -826,14 +826,14 @@ describe("InterviewPageContent lifecycle", () => {
     expect(confirmation).not.toBeChecked();
     expect(confirmation).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: "대상 설계 다시 불러오기" }),
+      screen.getByRole("button", { name: "대상 디자인 다시 불러오기" }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "정확한 제안 적용" }),
     ).toBeDisabled();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "대상 설계 다시 불러오기" }),
+      screen.getByRole("button", { name: "대상 디자인 다시 불러오기" }),
     );
     expect(await screen.findByText(refreshedDesign.digest)).toBeInTheDocument();
     expect(confirmation).not.toBeChecked();
@@ -897,7 +897,7 @@ describe("InterviewPageContent lifecycle", () => {
     fireEvent.click(screen.getByRole("button", { name: "정확한 제안 적용" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "적용 대상 설계를 찾을 수 없습니다",
+      "적용 대상 디자인을 찾을 수 없습니다",
     );
     expect(composer).toHaveValue(pendingAnswer.answer);
     expect(screen.getByText(proposal.digest)).toBeInTheDocument();
@@ -983,7 +983,7 @@ describe("InterviewPageContent lifecycle", () => {
     render(<InterviewPageContent interviewId="interview-1" />);
 
     await screen.findByText(proposal.digest);
-    fireEvent.click(screen.getByRole("button", { name: "설계 제안 생성" }));
+    fireEvent.click(screen.getByRole("button", { name: "디자인 제안 생성" }));
 
     expect(
       await screen.findByText(/인터뷰가 만료되었거나 삭제되었습니다/),
@@ -1023,7 +1023,7 @@ describe("InterviewPageContent lifecycle", () => {
     );
     await screen.findByText("어디에서 작업이 가장 오래 멈추나요?");
 
-    fireEvent.click(screen.getByRole("button", { name: "삭제 확인" }));
+    fireEvent.click(screen.getByRole("button", { name: "삭제" }));
     fireEvent.click(screen.getByRole("button", { name: "인터뷰 영구 삭제" }));
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/studio"));

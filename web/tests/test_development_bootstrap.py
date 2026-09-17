@@ -143,7 +143,7 @@ def test_bootstrap_with_samples_is_explicit_and_idempotent(
     assert all(result.created for result in first)
     assert not any(result.created for result in second)
     with Session(engine) as session:
-        assert session.query(HarnessDesign).count() == 4
+        assert session.query(HarnessDesign).count() == 5
     engine.dispose()
 
 
@@ -180,6 +180,7 @@ def test_sample_registry_seed_creates_published_assets_idempotently(
         "test-first-implementation",
         "code-review",
         "manual-handoff",
+        "full-sdlc-delivery",
     ]
     assert all(result.created for result in first)
     assert not any(result.created for result in second)
@@ -191,11 +192,12 @@ def test_sample_registry_seed_creates_published_assets_idempotently(
 
         assert [asset.slug for asset in assets] == [
             "code-review",
+            "full-sdlc-delivery",
             "issue-planning",
             "manual-handoff",
             "test-first-implementation",
         ]
-        assert len(versions) == 4
+        assert len(versions) == 5
         assert all(version.version == "1.0.0" for version in versions)
         assert all(version.status == "published" for version in versions)
         assert all(version.channel == "stable" for version in versions)
@@ -246,11 +248,11 @@ def test_concurrent_fresh_bootstrap_with_samples_is_duplicate_free(
     with ThreadPoolExecutor(max_workers=2) as executor:
         outcomes = list(executor.map(lambda _: run_bootstrap(), range(2)))
 
-    assert sum(sum(outcome) for outcome in outcomes) == 4
+    assert sum(sum(outcome) for outcome in outcomes) == 5
     with Session(engine) as session:
         assert session.query(Organization).count() == 1
         assert session.query(Membership).count() == 1
-        assert session.query(HarnessDesign).count() == 4
+        assert session.query(HarnessDesign).count() == 5
     engine.dispose()
 
 
@@ -346,7 +348,7 @@ def test_bootstrap_cli_with_sample_designs_reports_seed_results(
     finally:
         get_settings.cache_clear()
 
-    assert len(payload["sample_designs"]) == 8
+    assert len(payload["sample_designs"]) == 10
     assert all(sample["created"] for sample in payload["sample_designs"])
     assert {sample["language"] for sample in payload["sample_designs"]} == {"ko", "en"}
     assert [sample["template"] for sample in payload["sample_registry"]] == [
@@ -354,10 +356,12 @@ def test_bootstrap_cli_with_sample_designs_reports_seed_results(
         "test-first-implementation",
         "code-review",
         "manual-handoff",
+        "full-sdlc-delivery",
         "issue-planning",
         "test-first-implementation",
         "code-review",
         "manual-handoff",
+        "full-sdlc-delivery",
     ]
     assert {sample["language"] for sample in payload["sample_registry"]} == {"ko", "en"}
     assert all(sample["created"] for sample in payload["sample_registry"])
@@ -444,9 +448,10 @@ def test_bootstrapped_registry_samples_are_visible_and_downloadable_via_api(
         list_data = list_response.json()
         assert list_data["ok"] is True
         assets = list_data["items"]
-        assert len(assets) == 4
+        assert len(assets) == 5
         assert [asset["slug"] for asset in assets] == [
             "code-review",
+            "full-sdlc-delivery",
             "issue-planning",
             "manual-handoff",
             "test-first-implementation",

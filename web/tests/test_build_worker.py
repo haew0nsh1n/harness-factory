@@ -545,6 +545,67 @@ def test_submit_rejects_reuse_when_effective_approval_is_stale_or_rejected(
             service.submit(build_actor(), design.id, design.digest)
 
 
+def test_submit_marks_design_built_when_reusing_a_built_artifact(tmp_path):
+    engine = create_sqlite_engine()
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        seed_organization(session)
+        design = seed_design(session)
+        session.commit()
+        workspace_factory = RecordingWorkspaceFactory(root=tmp_path, created_paths=[])
+        service = create_build_service(
+            session, tmp_path, workspace_factory=workspace_factory
+        )
+
+        queued = service.submit(build_actor(), design.id, design.digest)
+        assert queued is not None
+        built = service.run_next()
+        assert built is not None
+        assert built.status == BUILD_STATUS_SUCCEEDED
+        # Re-approving the same digest drops a built design back to approved.
+        design.status = DESIGN_STATUS_APPROVED
+        session.flush()
+
+        reused = service.submit(build_actor(), design.id, design.digest)
+        session.refresh(design)
+
+    assert reused is not None
+    assert reused.id == queued.id
+    assert reused.status == BUILD_STATUS_SUCCEEDED
+    assert design.status == DESIGN_STATUS_BUILT
+
+
+def test_submit_requeues_a_reused_build_whose_artifact_is_missing(tmp_path):
+    engine = create_sqlite_engine()
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        seed_organization(session)
+        design = seed_design(session)
+        session.commit()
+        workspace_factory = RecordingWorkspaceFactory(root=tmp_path, created_paths=[])
+        service = create_build_service(
+            session, tmp_path, workspace_factory=workspace_factory
+        )
+
+        service.submit(build_actor(), design.id, design.digest)
+        built = service.run_next()
+        assert built is not None
+        assert built.artifact_key is not None
+        # Simulate an orphaned success: the stored artifact file is gone.
+        (tmp_path / "artifacts" / built.artifact_key).unlink()
+        design.status = DESIGN_STATUS_APPROVED
+        session.flush()
+
+        reused = service.submit(build_actor(), design.id, design.digest)
+        session.refresh(design)
+
+    assert reused is not None
+    assert reused.status == BUILD_STATUS_QUEUED
+    assert design.status == DESIGN_STATUS_BUILD_QUEUED
+
+
 def test_run_next_builds_checks_archives_and_stores_a_deterministic_artifact(tmp_path):
     engine = create_sqlite_engine()
     Base.metadata.create_all(engine)

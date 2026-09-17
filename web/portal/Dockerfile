@@ -9,6 +9,7 @@ RUN npm ci
 
 COPY next.config.ts tsconfig.json next-env.d.ts vitest.config.ts ./
 COPY src ./src
+COPY public ./public
 
 RUN npm run build
 

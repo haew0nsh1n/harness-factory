@@ -12,7 +12,8 @@ import {
   replaceRow,
 } from "@/components/studio/DesignFormFields";
 import { updateDocumentField, type JsonDocument } from "@/lib/designForms";
-import { useTranslations } from "@/i18n/I18nProvider";
+import { useLocale, useTranslations } from "@/i18n/I18nProvider";
+import { scenarioLabel } from "@/i18n/scenarioLabels";
 
 const SCENARIO_STATES = [
   "awaiting-answer",
@@ -35,6 +36,7 @@ export function ScenarioForm({
   onChange: (document: JsonDocument) => void;
 }) {
   const t = useTranslations();
+  const locale = useLocale();
   const scenarios = objectRows(document.scenarios);
   return (
     <section className="workspace-panel structured-editor">
@@ -60,10 +62,11 @@ export function ScenarioForm({
       <ObjectListSection title={t("scenarioForm.section")} error={errors["scenarios.scenarios"]} onAdd={() => onChange(updateDocumentField(document, "scenarios", appendRow(document.scenarios, { id: "", given: "", expect: "blocked", forbidden: [] })))}>
         {scenarios.map(({ value: scenario, originalIndex: index }) => {
           const id = typeof scenario.id === "string" && scenario.id ? scenario.id : t("scenarioForm.fallback", { n: index + 1 });
+          const label = typeof scenario.id === "string" ? scenarioLabel(scenario.id, locale) : "";
           const updateScenario = (field: string, value: unknown) =>
             onChange(updateDocumentField(document, "scenarios", replaceRow(document.scenarios, index, updateDocumentField(scenario, field, value))));
           return (
-            <NestedCard key={`scenario-${index}`} title={id} removeLabel={t("scenarioForm.remove", { id })} onRemove={() => onChange(updateDocumentField(document, "scenarios", removeRow(document.scenarios, index)))}>
+            <NestedCard key={`scenario-${index}`} title={id} subtitle={label || undefined} removeLabel={t("scenarioForm.remove", { id })} onRemove={() => onChange(updateDocumentField(document, "scenarios", removeRow(document.scenarios, index)))}>
               <TextField label={t("scenarioForm.id", { id })} value={scenario.id} error={errors[`scenarios.scenarios.${index}.id`]} onChange={(value) => updateScenario("id", value)} />
               <TextField multiline label={t("scenarioForm.given", { id })} value={scenario.given} error={errors[`scenarios.scenarios.${index}.given`]} onChange={(value) => updateScenario("given", value)} />
               <SelectField label={t("scenarioForm.expect", { id })} value={scenario.expect} options={SCENARIO_STATES} error={errors[`scenarios.scenarios.${index}.expect`]} onChange={(value) => updateScenario("expect", value)} />

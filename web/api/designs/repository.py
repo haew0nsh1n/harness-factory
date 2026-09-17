@@ -7,6 +7,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from web.api.builds.models import BuildJob
 from web.api.designs.digest import design_digest
 from web.api.designs.models import (
     APPROVAL_SUBJECT_TYPE_HARNESS_DESIGN,
@@ -212,6 +213,21 @@ class HarnessDesignRepository:
                 Approval.subject_id == design_id,
             )
         )
+
+    def delete(self, organization_id: str, design_id: str) -> bool:
+        design = self.get(organization_id, design_id)
+        if design is None:
+            return False
+        self._session.execute(
+            delete(BuildJob).where(
+                BuildJob.organization_id == organization_id,
+                BuildJob.design_id == design_id,
+            )
+        )
+        self.clear_approvals(organization_id, design_id)
+        self._session.delete(design)
+        self._session.flush()
+        return True
 
     def save_validation(
         self,

@@ -33,13 +33,19 @@ export function SelectedStagesProvider({
 export interface StageProgressProps {
   stage: string;
   selectedStages?: readonly string[];
+  // When set, show every SDLC stage and mark these as in-scope (green).
+  highlight?: readonly string[];
 }
 
-export function StageProgress({ stage, selectedStages }: StageProgressProps) {
+export function StageProgress({ stage, selectedStages, highlight }: StageProgressProps) {
   const t = useTranslations();
   const contextualStages = useContext(selectedStagesContext);
-  const selected = selectedStages ?? contextualStages ?? SDLC_STAGES.map((item) => item.id);
+  const overview = highlight !== undefined;
+  const selected = overview
+    ? SDLC_STAGES.map((item) => item.id)
+    : selectedStages ?? contextualStages ?? SDLC_STAGES.map((item) => item.id);
   const visibleStages = SDLC_STAGES.filter((item) => selected.includes(item.id));
+  const inScope = new Set(highlight ?? []);
   const hasCurrentStage = visibleStages.some((item) => item.id === stage);
   const isSummary = stage === "summary";
 
@@ -47,23 +53,27 @@ export function StageProgress({ stage, selectedStages }: StageProgressProps) {
     <nav className="stage-progress" aria-label={t("stageProgress.aria")}>
       <div className="stage-progress-header">
         <p className="eyebrow">{t("stageProgress.scope")}</p>
-        {!hasCurrentStage ? (
+        {!overview && !hasCurrentStage ? (
           <p className="stage-unavailable">
             {isSummary ? t("stageProgress.selectedComplete") : t("stageProgress.interviewUnavailable")}
           </p>
         ) : null}
       </div>
       <ol>
-        {visibleStages.map((item) => (
-          <li
-            key={item.id}
-            className={item.id === stage ? "stage-current" : undefined}
-          >
-            <span aria-current={item.id === stage ? "step" : undefined}>
-              {t(item.labelKey)}
-            </span>
-          </li>
-        ))}
+        {visibleStages.map((item) => {
+          const isCurrent = item.id === stage;
+          const className =
+            [isCurrent ? "stage-current" : null, overview && inScope.has(item.id) ? "stage-in-scope" : null]
+              .filter(Boolean)
+              .join(" ") || undefined;
+          return (
+            <li key={item.id} className={className}>
+              <span aria-current={isCurrent ? "step" : undefined}>
+                {t(item.labelKey)}
+              </span>
+            </li>
+          );
+        })}
       </ol>
     </nav>
   );

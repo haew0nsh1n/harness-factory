@@ -18,6 +18,7 @@ export interface EvidenceItem {
 export interface InterviewWorkspaceProps {
   title: string;
   stage: string;
+  stageHighlight?: readonly string[];
   evidence: EvidenceItem[];
   conversation: React.ReactNode;
   composer: React.ReactNode;
@@ -30,6 +31,7 @@ type MobileRailTab = "evidence" | "proposal";
 export function InterviewWorkspace({
   title,
   stage,
+  stageHighlight,
   evidence,
   conversation,
   composer,
@@ -74,7 +76,7 @@ export function InterviewWorkspace({
       </header>
 
       <div className="interview-workspace-grid">
-        <StageProgress stage={stage} />
+        <StageProgress stage={stage} highlight={stageHighlight} />
 
         <div className="conversation-column">
           <div className="conversation-surface">{conversation}</div>

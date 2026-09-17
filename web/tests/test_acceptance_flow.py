@@ -162,6 +162,20 @@ def test_end_to_end_acceptance_flow_blocks_cross_tenant_reads_and_keeps_audit_ke
     assert succeeded_build["status"] == "succeeded"
     assert succeeded_build["artifact_key"].endswith("/package.tar")
 
+    list_builds_response = acceptance_client.get(
+        f"/api/designs/{design['id']}/builds",
+        headers=build_headers(
+            organization_id="org-acme",
+            subject_id="author-1",
+            roles="author",
+        ),
+    )
+    assert list_builds_response.status_code == 200
+    listed_builds = list_builds_response.json()["builds"]
+    assert len(listed_builds) >= 1
+    assert listed_builds[0]["id"] == build["id"]
+    assert listed_builds[0]["status"] == "succeeded"
+
     create_asset_response = acceptance_client.post(
         "/api/registry/assets",
         headers=build_headers(

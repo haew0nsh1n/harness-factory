@@ -13,6 +13,10 @@ function jsonResponse(body: object): Response {
   });
 }
 
+function openTab(name: string) {
+  fireEvent.click(screen.getByRole("tab", { name }));
+}
+
 function designFixture(status: "draft" | "validated" | "approved" | "build-queued" | "built" | "failed") {
   return {
     id: "design-1",
@@ -83,7 +87,7 @@ describe("StudioDesignPageContent", () => {
     ["draft", false, true, true],
     ["validated", true, false, true],
     ["approved", true, true, false],
-    ["built", true, true, false],
+    ["built", true, true, true],
   ] as const)(
     "enables lifecycle buttons from %s status",
     async (status, validateDisabled, approveDisabled, queueDisabled) => {
@@ -92,7 +96,7 @@ describe("StudioDesignPageContent", () => {
       render(<StudioDesignPageContent designId="design-1" />);
 
       expect(await screen.findByRole("heading", { name: `Design ${status}` })).toBeInTheDocument();
-      const validateButton = screen.getByRole("button", { name: "설계 검증" });
+      const validateButton = screen.getByRole("button", { name: "디자인 검증" });
       const approveButton = screen.getByRole("button", { name: "다이제스트 승인" });
       const rejectButton = screen.getByRole("button", { name: "검토 반려" });
       const queueButton = screen.getByRole("button", { name: "빌드 요청" });
@@ -140,12 +144,14 @@ describe("StudioDesignPageContent", () => {
 
     render(<StudioDesignPageContent designId="design-1" />);
 
+    await screen.findByRole("heading", { name: "Design built" });
+    openTab("레지스트리 등록");
     expect(
       await screen.findByRole("heading", { name: "레지스트리 등록" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "설계 검증" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "디자인 검증" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "다이제스트 승인" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "빌드 요청" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "빌드 요청" })).toBeDisabled();
   });
 
   test("shows field-specific parse validation and prevents submission", async () => {
@@ -156,11 +162,12 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
-    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    openTab("고급");
+    fireEvent.click(screen.getByText("디버그 JSON"));
     fireEvent.change(screen.getByLabelText("워크플로우 JSON"), {
       target: { value: "{bad-workflow" },
     });
-    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    fireEvent.click(screen.getByText("디버그 JSON"));
     fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
 
     expect(
@@ -184,11 +191,12 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
+    openTab("고급");
     expect(
       screen.getByRole("textbox", { name: "워크플로우 JSON" }),
     ).not.toBeVisible();
 
-    const summary = screen.getByText("고급 / 디버그 JSON");
+    const summary = screen.getByText("디버그 JSON");
     summary.focus();
     fireEvent.keyDown(summary, { key: "Enter" });
     fireEvent.click(summary);
@@ -215,7 +223,8 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
-    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    openTab("고급");
+    fireEvent.click(screen.getByText("디버그 JSON"));
     const workflowJson = screen.getByRole("textbox", { name: "워크플로우 JSON" });
     fireEvent.change(workflowJson, { target: { value: "{first-invalid" } });
     fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
@@ -224,7 +233,7 @@ describe("StudioDesignPageContent", () => {
     ).toBeGreaterThan(0);
 
     fireEvent.change(workflowJson, { target: { value: "{second-invalid" } });
-    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    fireEvent.click(screen.getByText("디버그 JSON"));
 
     expect(
       screen.getByRole("button", { name: "디버그 JSON 열고 수정" }),
@@ -254,7 +263,8 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
-    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    openTab("고급");
+    fireEvent.click(screen.getByText("디버그 JSON"));
     fireEvent.change(screen.getByLabelText("프로필 JSON"), {
       target: {
         value: JSON.stringify(
@@ -302,7 +312,8 @@ describe("StudioDesignPageContent", () => {
     fireEvent.change(screen.getByLabelText("고객 이름"), {
       target: { value: "Form-edited team" },
     });
-    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    openTab("고급");
+    fireEvent.click(screen.getByText("디버그 JSON"));
     const profileJson = screen.getByLabelText("프로필 JSON");
     const advanced = JSON.parse((profileJson as HTMLTextAreaElement).value);
     advanced.constraints = ["Updated in advanced JSON"];
@@ -340,13 +351,15 @@ describe("StudioDesignPageContent", () => {
     fireEvent.change(pendingTerm, { target: { value: "handoff" } });
     expect(screen.getByText(/이미 존재하는 용어입니다/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    openTab("고급");
+    fireEvent.click(screen.getByText("디버그 JSON"));
     const workflowJson = screen.getByLabelText("워크플로우 JSON");
     const originalWorkflow = (workflowJson as HTMLTextAreaElement).value;
     fireEvent.change(workflowJson, { target: { value: "{invalid" } });
     expect(screen.getByText(/구조화된 양식을 갱신할 수 없는 JSON 형식/)).toBeInTheDocument();
     fireEvent.change(workflowJson, { target: { value: originalWorkflow } });
 
+    openTab("프로필");
     expect(screen.getByLabelText("용어 1 키")).toHaveValue("handoff");
     expect(screen.getByText(/이미 존재하는 용어입니다/)).toBeInTheDocument();
     const event = new Event("beforeunload", { cancelable: true });
@@ -400,11 +413,13 @@ describe("StudioDesignPageContent", () => {
       target: { value: "reviewer" },
     });
 
-    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    openTab("고급");
+    fireEvent.click(screen.getByText("디버그 JSON"));
     const profile = JSON.parse(
       (screen.getByLabelText("프로필 JSON") as HTMLTextAreaElement).value,
     );
     expect(profile.roles).toEqual(["reviewer", invalidRole]);
+    openTab("프로필");
     expect(screen.getByText(/모든 항목은 문자열이어야 합니다/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
@@ -432,12 +447,14 @@ describe("StudioDesignPageContent", () => {
       target: { value: "Edited valid sibling" },
     });
 
-    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    openTab("고급");
+    fireEvent.click(screen.getByText("디버그 JSON"));
     const profile = JSON.parse(
       (screen.getByLabelText("프로필 JSON") as HTMLTextAreaElement).value,
     );
     expect(profile.pains[0].description).toBe("Edited valid sibling");
     expect(profile.pains[1]).toBe(invalidPain);
+    openTab("프로필");
     expect(screen.getByText(/현재 값은 객체 목록이어야 합니다/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "초안 저장" }));
@@ -479,7 +496,8 @@ describe("StudioDesignPageContent", () => {
     expect(await screen.findByText(/양식 오류를 수정한 뒤 저장하세요/)).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    openTab("고급");
+    fireEvent.click(screen.getByText("디버그 JSON"));
     const profile = JSON.parse(
       (screen.getByLabelText("프로필 JSON") as HTMLTextAreaElement).value,
     );
@@ -522,7 +540,8 @@ describe("StudioDesignPageContent", () => {
     expect(await screen.findByText(/양식 오류를 수정한 뒤 저장하세요/)).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    openTab("고급");
+    fireEvent.click(screen.getByText("디버그 JSON"));
     const profile = JSON.parse(
       (screen.getByLabelText("프로필 JSON") as HTMLTextAreaElement).value,
     );
@@ -574,7 +593,8 @@ describe("StudioDesignPageContent", () => {
     }
     fireEvent.blur(termInput);
 
-    fireEvent.click(screen.getByText("고급 / 디버그 JSON"));
+    openTab("고급");
+    fireEvent.click(screen.getByText("디버그 JSON"));
     await waitFor(() => {
       const profile = JSON.parse(
         (screen.getByLabelText("프로필 JSON") as HTMLTextAreaElement).value,
@@ -609,9 +629,14 @@ describe("StudioDesignPageContent", () => {
     fireEvent.change(screen.getByLabelText("이슈 트래커 프로젝트"), {
       target: { value: "TEAM" },
     });
+    openTab("워크플로우");
+    fireEvent.click(
+      screen.getByRole("button", { name: /Clarify acceptance criteria/ }),
+    );
     fireEvent.change(screen.getByLabelText("clarify 단계 승인 시점"), {
       target: { value: "before" },
     });
+    openTab("시나리오");
     fireEvent.change(screen.getByLabelText("normal-handoff 시나리오 예상 상태"), {
       target: { value: "completed" },
     });
@@ -641,7 +666,7 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
-    fireEvent.click(screen.getByRole("button", { name: "설계 검증" }));
+    fireEvent.click(screen.getByRole("button", { name: "디자인 검증" }));
 
     await screen.findByText("검증됨");
     expect(fetchSpy).toHaveBeenNthCalledWith(
@@ -734,7 +759,7 @@ describe("StudioDesignPageContent", () => {
 
     expect(await screen.findByText("빌드 대기")).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "설계 검증" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "디자인 검증" })).toBeDisabled();
       expect(screen.getByRole("button", { name: "다이제스트 승인" })).toBeDisabled();
     });
     const [, options] = fetchSpy.mock.calls[1] ?? [];
@@ -776,7 +801,7 @@ describe("StudioDesignPageContent", () => {
 
     expect(await screen.findByText("빌드 대기")).toBeInTheDocument();
     expect(
-      await screen.findByText("빌드를 요청했지만 최신 설계 상태를 불러오지 못했습니다."),
+      await screen.findByText("빌드를 요청했지만 최신 디자인 상태를 불러오지 못했습니다."),
     ).toBeInTheDocument();
     expect(screen.queryByText("빌드를 요청하지 못했습니다.")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "빌드 요청" })).toBeDisabled();
@@ -816,7 +841,8 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
-    fireEvent.click(screen.getByRole("button", { name: "설계 검증" }));
+    fireEvent.click(screen.getByRole("button", { name: "디자인 검증" }));
+    openTab("빌드");
 
     expect(
       await screen.findByText(
@@ -855,11 +881,12 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
-    fireEvent.click(screen.getByRole("button", { name: "설계 검증" }));
+    fireEvent.click(screen.getByRole("button", { name: "디자인 검증" }));
+    openTab("카탈로그");
 
     expect(
       await screen.findByText(
-        /catalog: invalid-design: validation: catalog: snapshot does not match server catalog/,
+        /invalid-design: validation: catalog: snapshot does not match server catalog/,
       ),
     ).toBeInTheDocument();
   });
@@ -892,7 +919,8 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
-    fireEvent.click(screen.getByRole("button", { name: "설계 검증" }));
+    fireEvent.click(screen.getByRole("button", { name: "디자인 검증" }));
+    openTab("워크플로우");
 
     const finding = await screen.findByText(/onerror=/);
     expect(finding.querySelector("img")).toBeNull();
@@ -921,6 +949,8 @@ describe("StudioDesignPageContent", () => {
 
     render(<StudioDesignPageContent designId="design-1" />);
 
+    await screen.findByRole("heading", { name: "Design draft" });
+    openTab("근거");
     expect(
       await screen.findByRole("heading", {
         name: "대화형 인터뷰는 아직 제공되지 않습니다.",
@@ -945,10 +975,11 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
+    openTab("카탈로그");
     expect(screen.getByRole("heading", { name: "승인 카탈로그" })).toBeInTheDocument();
     expect(screen.getByText(/6개 스킬/)).toBeInTheDocument();
     expect(
-      screen.getByRole("textbox", { name: "카탈로그 JSON" }),
-    ).not.toBeVisible();
+      screen.queryByRole("textbox", { name: "카탈로그 JSON" }),
+    ).not.toBeInTheDocument();
   });
 });

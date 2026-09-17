@@ -115,12 +115,32 @@ async function proxyRequest(
     body,
     cache: "no-store",
   });
+
+  const contentType = response.headers.get("content-type") ?? "application/json";
+
+  if (!contentType.includes("application/json")) {
+    const passthrough = new Headers({ "content-type": contentType });
+    const disposition = response.headers.get("content-disposition");
+    if (disposition) {
+      passthrough.set("content-disposition", disposition);
+    }
+    const length = response.headers.get("content-length");
+    if (length) {
+      passthrough.set("content-length", length);
+    }
+    const buffer = await response.arrayBuffer();
+    return new NextResponse(buffer, {
+      status: response.status,
+      headers: passthrough,
+    });
+  }
+
   const responseBody = await response.text();
 
   return new NextResponse(responseBody, {
     status: response.status,
     headers: {
-      "content-type": response.headers.get("content-type") ?? "application/json",
+      "content-type": contentType,
     },
   });
 }
