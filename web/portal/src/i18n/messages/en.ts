@@ -16,11 +16,13 @@ export const en: Messages = {
     studio: "Studio",
     registry: "Registry",
     help: "Help",
+    settings: "Settings",
   },
   help: {
     eyebrow: "Getting started",
     heading: "How Harness Factory works",
     intro: "Harness Factory interviews customers to understand their existing SDLC, engineering culture, bottlenecks, and goals, generates a skill-based, AI-native development workflow tailored to each customer's context, and spreads it as a reusable asset across the organization.",
+    philosophy: "We do not force organizations into a fixed methodology. We first understand an organization's development practices and problems, then design the SDLC it needs.",
     overviewAlt: "Harness Factory overview diagram",
     flowIntro: "Harness Factory runs in the following steps.",
     flowAria: "Workflow steps",
@@ -830,6 +832,12 @@ export const en: Messages = {
     close: "Close",
     done: "Done",
     empty: "No items yet. Use the add button above to create one.",
+  },
+  settings: {
+    eyebrow: "Admin",
+    heading: "Settings",
+    intro: "Administrator settings.",
+    comingSoon: "Admin features such as adding skills are coming soon.",
   },
   locale: {
     label: "Language",

@@ -14,11 +14,13 @@ export const ko = {
     studio: "스튜디오",
     registry: "레지스트리",
     help: "도움말",
+    settings: "설정",
   },
   help: {
     eyebrow: "사용 안내",
     heading: "Harness Factory 개요",
     intro: "Harness Factory는 고객 인터뷰를 통해 기존 SDLC, 개발 문화, 병목과 목표를 파악하고 고객 맥락에 맞는 스킬 기반 AI-native 개발 워크플로우를 생성해 조직 내 재사용 가능한 자산으로 확산하는 프로젝트입니다.",
+    philosophy: "우리는 정해진 방법론에 조직을 맞추지 않습니다. 조직의 개발 방식과 문제를 먼저 이해하고, 필요한 SDLC를 설계합니다.",
     overviewAlt: "Harness Factory 개요 다이어그램",
     flowIntro: "Harness Factory는 아래 단계로 수행됩니다.",
     flowAria: "작업 흐름",
@@ -824,6 +826,12 @@ export const ko = {
     close: "닫기",
     done: "완료",
     empty: "표시할 항목이 없습니다. 위의 추가 버튼으로 단계를 만드세요.",
+  },
+  settings: {
+    eyebrow: "관리자",
+    heading: "설정",
+    intro: "관리자 설정 화면입니다.",
+    comingSoon: "스킬 추가 등 어드민 기능은 곧 제공됩니다.",
   },
   locale: {
     label: "언어",

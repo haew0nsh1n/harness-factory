@@ -237,6 +237,14 @@ button {
   padding: 0.5rem 0 1rem;
 }
 
+.help-philosophy {
+  margin-top: 0.6rem;
+  padding-left: 0.9rem;
+  border-left: 3px solid var(--hf-action);
+  color: var(--hf-action-strong);
+  font-weight: 700;
+}
+
 .page-intro .eyebrow,
 .workspace-panel .eyebrow {
   margin: 0 0 0.4rem;
@@ -1610,6 +1618,32 @@ td a:hover {
   color: var(--hf-action);
   font-size: 0.8rem;
   font-weight: 700;
+}
+
+.sidebar-help-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sidebar-help-row .sidebar-help-link {
+  margin-top: 0;
+}
+
+.sidebar-settings-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.4rem;
+  color: var(--hf-muted);
+}
+
+.sidebar-settings-link:hover {
+  color: var(--hf-action);
+  background: var(--hf-info-bg);
 }
 
 .privacy-notice {

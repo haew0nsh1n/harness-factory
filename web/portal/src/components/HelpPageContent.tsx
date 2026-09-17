@@ -31,6 +31,7 @@ export function HelpPageContent() {
         <p className="eyebrow">{t("help.eyebrow")}</p>
         <h1 className="workspace-heading">{t("help.heading")}</h1>
         <p className="page-description">{t("help.intro")}</p>
+        <p className="page-description help-philosophy">{t("help.philosophy")}</p>
       </header>
       <section className="workspace-panel help-overview">
         <img
