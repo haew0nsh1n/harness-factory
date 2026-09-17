@@ -87,7 +87,7 @@ describe("StudioDesignPageContent", () => {
     ["draft", false, true, true],
     ["validated", true, false, true],
     ["approved", true, true, false],
-    ["built", true, true, false],
+    ["built", true, true, true],
   ] as const)(
     "enables lifecycle buttons from %s status",
     async (status, validateDisabled, approveDisabled, queueDisabled) => {
@@ -96,7 +96,7 @@ describe("StudioDesignPageContent", () => {
       render(<StudioDesignPageContent designId="design-1" />);
 
       expect(await screen.findByRole("heading", { name: `Design ${status}` })).toBeInTheDocument();
-      const validateButton = screen.getByRole("button", { name: "설계 검증" });
+      const validateButton = screen.getByRole("button", { name: "디자인 검증" });
       const approveButton = screen.getByRole("button", { name: "다이제스트 승인" });
       const rejectButton = screen.getByRole("button", { name: "검토 반려" });
       const queueButton = screen.getByRole("button", { name: "빌드 요청" });
@@ -149,9 +149,9 @@ describe("StudioDesignPageContent", () => {
     expect(
       await screen.findByRole("heading", { name: "레지스트리 등록" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "설계 검증" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "디자인 검증" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "다이제스트 승인" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "빌드 요청" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "빌드 요청" })).toBeDisabled();
   });
 
   test("shows field-specific parse validation and prevents submission", async () => {
@@ -663,7 +663,7 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
-    fireEvent.click(screen.getByRole("button", { name: "설계 검증" }));
+    fireEvent.click(screen.getByRole("button", { name: "디자인 검증" }));
 
     await screen.findByText("검증됨");
     expect(fetchSpy).toHaveBeenNthCalledWith(
@@ -756,7 +756,7 @@ describe("StudioDesignPageContent", () => {
 
     expect(await screen.findByText("빌드 대기")).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "설계 검증" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "디자인 검증" })).toBeDisabled();
       expect(screen.getByRole("button", { name: "다이제스트 승인" })).toBeDisabled();
     });
     const [, options] = fetchSpy.mock.calls[1] ?? [];
@@ -798,7 +798,7 @@ describe("StudioDesignPageContent", () => {
 
     expect(await screen.findByText("빌드 대기")).toBeInTheDocument();
     expect(
-      await screen.findByText("빌드를 요청했지만 최신 설계 상태를 불러오지 못했습니다."),
+      await screen.findByText("빌드를 요청했지만 최신 디자인 상태를 불러오지 못했습니다."),
     ).toBeInTheDocument();
     expect(screen.queryByText("빌드를 요청하지 못했습니다.")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "빌드 요청" })).toBeDisabled();
@@ -838,7 +838,7 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
-    fireEvent.click(screen.getByRole("button", { name: "설계 검증" }));
+    fireEvent.click(screen.getByRole("button", { name: "디자인 검증" }));
     openTab("빌드");
 
     expect(
@@ -878,7 +878,7 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
-    fireEvent.click(screen.getByRole("button", { name: "설계 검증" }));
+    fireEvent.click(screen.getByRole("button", { name: "디자인 검증" }));
     openTab("카탈로그");
 
     expect(
@@ -916,7 +916,7 @@ describe("StudioDesignPageContent", () => {
     render(<StudioDesignPageContent designId="design-1" />);
 
     await screen.findByRole("heading", { name: "Design draft" });
-    fireEvent.click(screen.getByRole("button", { name: "설계 검증" }));
+    fireEvent.click(screen.getByRole("button", { name: "디자인 검증" }));
     openTab("워크플로우");
 
     const finding = await screen.findByText(/onerror=/);

@@ -307,7 +307,7 @@ describe("RegistryPublishPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "버전 생성" }));
 
     expect(
-      await screen.findByText(/같은 1.0.0 버전이 있지만 현재 설계와 일치하지 않습니다/),
+      await screen.findByText(/같은 1.0.0 버전이 있지만 현재 디자인과 일치하지 않습니다/),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "레지스트리 버전 승인" }),
@@ -355,7 +355,7 @@ describe("RegistryPublishPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "버전 생성" }));
 
     expect(
-      await screen.findByText("기존 1.0.0 버전이 현재 설계와 일치해 다시 불러왔습니다."),
+      await screen.findByText("기존 1.0.0 버전이 현재 디자인과 일치해 다시 불러왔습니다."),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "레지스트리 버전 승인" })).toBeEnabled();
   });
@@ -402,7 +402,7 @@ describe("RegistryPublishPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "버전 생성" }));
 
     expect(
-      await screen.findByText("기존 1.0.0 버전이 현재 설계와 일치해 다시 불러왔습니다."),
+      await screen.findByText("기존 1.0.0 버전이 현재 디자인과 일치해 다시 불러왔습니다."),
     ).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenNthCalledWith(
       4,

@@ -162,10 +162,12 @@ export function DashboardPageContent() {
 
   if (!metrics) {
     return (
-      <section className="workspace-panel state-panel" aria-busy="true">
-        <p className="eyebrow">{t("dashboard.loadingEyebrow")}</p>
-        <h1 className="workspace-heading">{t("dashboard.loadingHeading")}</h1>
-      </section>
+      <p className="operation-status" role="status" aria-live="polite">
+        <span className="operation-dots" aria-hidden="true">
+          •••
+        </span>
+        {t("dashboard.loadingHeading")}
+      </p>
     );
   }
 
@@ -173,7 +175,7 @@ export function DashboardPageContent() {
     <div className="page-stack">
       <header className="page-intro">
         <p className="eyebrow">{t("dashboard.introEyebrow")}</p>
-        <h1 className="workspace-heading">{t("dashboard.introHeading")}</h1>
+        <h3 className="workspace-heading">{t("dashboard.introHeading")}</h3>
         <p className="page-description">{t("dashboard.introDescription")}</p>
       </header>
 

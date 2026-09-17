@@ -76,6 +76,19 @@ class BuildService:
     def get(self, organization_id: str, build_id: str) -> BuildJob | None:
         return self._repository.get(organization_id, build_id)
 
+    def list_recent(
+        self,
+        organization_id: str,
+        design_id: str,
+        limit: int = 3,
+    ) -> list[BuildJob] | None:
+        design = self._repository.get_design(organization_id, design_id)
+        if design is None:
+            return None
+        return self._repository.list_recent_for_design(
+            organization_id, design_id, limit
+        )
+
     def open_artifact(
         self, organization_id: str, design_id: str
     ) -> tuple[BinaryIO, str] | None:
@@ -97,6 +110,16 @@ class BuildService:
             return None
         filename = f"{design_id}-{design.digest[:12]}.tar"
         return stream, filename
+
+    def _artifact_available(self, job: BuildJob) -> bool:
+        if not job.artifact_key:
+            return False
+        try:
+            stream = self._storage.open(job.artifact_key)
+        except ArtifactStorageError:
+            return False
+        stream.close()
+        return True
 
     def submit(
         self,
@@ -231,6 +254,17 @@ class BuildService:
             return job
         if not self._is_reusable_submission_state(design, approval, job.status):
             raise InvalidBuildLifecycle()
+        if job.status == BUILD_STATUS_SUCCEEDED and not self._artifact_available(job):
+            # The recorded artifact file is gone; rebuild it instead of reusing.
+            self._repository.reset_for_retry(job)
+            self._repository.mark_design_build_queued(design)
+            return job
+        # A prior successful artifact for this digest means the design is built.
+        if (
+            job.status == BUILD_STATUS_SUCCEEDED
+            and design.status != DESIGN_STATUS_BUILT
+        ):
+            self._repository.mark_design_built(design)
         return job
 
     def _is_retryable_submission_state(

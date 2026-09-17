@@ -49,6 +49,9 @@ export async function AppShell({ children }: AppShellProps) {
             </form>
           )}
           <LocaleSwitcher />
+          <a className="sidebar-help-link" href="/help">
+            {t("nav.help")}
+          </a>
         </div>
       </aside>
       <main className="main-content">{children}</main>

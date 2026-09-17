@@ -80,6 +80,24 @@ class BuildJobRepository:
             .limit(1)
         )
 
+    def list_recent_for_design(
+        self,
+        organization_id: str,
+        design_id: str,
+        limit: int = 3,
+    ) -> list[BuildJob]:
+        return list(
+            self._session.scalars(
+                select(BuildJob)
+                .where(
+                    BuildJob.organization_id == organization_id,
+                    BuildJob.design_id == design_id,
+                )
+                .order_by(BuildJob.created_at.desc(), BuildJob.id.desc())
+                .limit(limit)
+            )
+        )
+
     def create(
         self,
         organization_id: str,
@@ -108,6 +126,10 @@ class BuildJobRepository:
 
     def mark_design_build_queued(self, design: HarnessDesign) -> None:
         design.status = DESIGN_STATUS_BUILD_QUEUED
+        self._session.flush()
+
+    def mark_design_built(self, design: HarnessDesign) -> None:
+        design.status = DESIGN_STATUS_BUILT
         self._session.flush()
 
     def reset_for_retry(self, job: BuildJob) -> BuildJob:

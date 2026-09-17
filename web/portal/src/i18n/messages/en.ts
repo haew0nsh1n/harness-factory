@@ -15,6 +15,64 @@ export const en: Messages = {
     dashboard: "Dashboard",
     studio: "Studio",
     registry: "Registry",
+    help: "Help",
+  },
+  help: {
+    eyebrow: "Getting started",
+    heading: "How Harness Factory works",
+    intro: "The flow runs from the interview to publishing and installing the workflow artifact.",
+    flowAria: "Workflow steps",
+    steps: {
+      interview: {
+        label: "Interview",
+        desc: "Collect requirements and evidence through an SDLC interview.",
+      },
+      design: {
+        label: "Design",
+        desc: "Turn evidence into a design proposal and save it.",
+      },
+      review: {
+        label: "Validate & approve",
+        desc: "Validate the design and approve the current digest.",
+      },
+      build: {
+        label: "Build",
+        desc: "Build the approved design into an artifact.",
+      },
+      registry: {
+        label: "Registry",
+        desc: "Create the asset and version, review, then publish to a channel.",
+      },
+      install: {
+        label: "Install",
+        desc: "Install the published workflow with the CLI.",
+      },
+    },
+    roleNote: "The steps you can perform depend on your roles (author, reviewer, registry-admin).",
+    roles: {
+      heading: "Role permissions",
+      author: "author — Creates and validates designs and requests builds.",
+      reviewer: "reviewer — Approves or rejects digests and approves registry versions.",
+      registryAdmin: "registry-admin — Manages registry assets and versions and publishes to channels.",
+    },
+    skillsSection: {
+      eyebrow: "Building blocks",
+      heading: "Harness skills used",
+      colName: "Skill",
+      colDesc: "Role",
+      colIo: "Inputs → outputs",
+      colSource: "Source repo",
+      colLicense: "License",
+      note: "Every skill references and adapts an external open-source skill at a pinned commit and keeps its original license.",
+    },
+    skillItems: {
+      clarify: { name: "hf-clarify", desc: "Turn an issue into an approved brief" },
+      plan: { name: "hf-plan", desc: "Turn a brief into a test-first plan" },
+      tdd: { name: "hf-tdd", desc: "Red-green-refactor with observed evidence" },
+      review: { name: "hf-review", desc: "Read-only intent and correctness review" },
+      manual: { name: "hf-manual", desc: "Human handoff with a named owner" },
+      issues: { name: "hf-issues-markdown", desc: "Manage one Git-tracked Markdown file per issue" },
+    },
   },
   footer: {
     devBadge: "Using development identity",
@@ -105,6 +163,7 @@ export const en: Messages = {
     colStatus: "Status",
     colUpdated: "Last changed",
     colNextAction: "Next action",
+    colScope: "SDLC scope",
     action: {
       draft: "Validate draft",
       validated: "Review digest",
@@ -112,6 +171,11 @@ export const en: Messages = {
       built: "View build result",
       default: "View design",
     },
+  },
+  sdlcScope: {
+    aria: "SDLC scope",
+    included: "Selected",
+    excluded: "Not selected",
   },
   registry: {
     eyebrow: "Asset Registry",
@@ -232,6 +296,8 @@ export const en: Messages = {
     buildStatusHeading: "Build status",
     noBuild: "No build was requested in this task.",
     downloadArtifact: "Download package",
+    versionsEyebrow: "Recent builds",
+    versionsHeading: "Artifact versions",
     serverValidationEyebrow: "Server validation",
     validationResults: "Validation results",
     noFindings: "No validation results.",

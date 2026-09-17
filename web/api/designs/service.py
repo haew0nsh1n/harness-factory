@@ -60,6 +60,31 @@ class DesignService:
     def get(self, organization_id: str, design_id: str):
         return self._repository.get(organization_id, design_id)
 
+    def delete(
+        self,
+        organization_id: str,
+        actor_id: str,
+        design_id: str,
+    ) -> bool:
+        design = self._repository.get(organization_id, design_id)
+        if design is None:
+            return False
+        deleted = self._repository.delete(organization_id, design_id)
+        if deleted:
+            self._audit_service.append(
+                organization_id=organization_id,
+                actor_id=actor_id,
+                action="design.deleted",
+                resource_type="harness-design",
+                resource_id=design_id,
+                summary={
+                    "name": design.name,
+                    "design_digest": design.digest,
+                    "revision": design.revision,
+                },
+            )
+        return deleted
+
     def replace_draft(
         self,
         organization_id: str,

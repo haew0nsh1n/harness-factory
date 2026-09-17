@@ -52,7 +52,7 @@ describe("StudioPageContent", () => {
     );
 
     render(<StudioPageContent />);
-    await screen.findByText("아직 저장된 설계가 없습니다.");
+    await screen.findByText("아직 저장된 디자인이 없습니다.");
 
     expect(screen.queryByLabelText(/password|token|credential|organization/i)).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/password|token|credential|organization/i)).not.toBeInTheDocument();
@@ -61,7 +61,7 @@ describe("StudioPageContent", () => {
   test("shows a failed initial request without claiming the design list is empty", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
-        JSON.stringify({ ok: false, error: "설계 서비스에 연결할 수 없습니다." }),
+        JSON.stringify({ ok: false, error: "디자인 서비스에 연결할 수 없습니다." }),
         {
           status: 503,
           headers: { "content-type": "application/json" },
@@ -73,9 +73,9 @@ describe("StudioPageContent", () => {
 
     expect(
       await screen.findByRole("alert"),
-    ).toHaveTextContent("설계 서비스에 연결할 수 없습니다.");
+    ).toHaveTextContent("디자인 서비스에 연결할 수 없습니다.");
     expect(
-      screen.queryByText("아직 저장된 설계가 없습니다."),
+      screen.queryByText("아직 저장된 디자인이 없습니다."),
     ).not.toBeInTheDocument();
   });
 });

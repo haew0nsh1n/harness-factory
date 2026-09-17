@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 
 import { StatusBadge } from "@/components/StatusBadge";
+import { SdlcScope } from "@/components/studio/SdlcScope";
+import { SDLC_STAGES } from "@/components/studio/StageProgress";
 import { useLocale, useTranslations } from "@/i18n/I18nProvider";
 import { api, ApiError } from "@/lib/api";
 import type {
@@ -10,6 +12,22 @@ import type {
   HarnessDesign,
   InterviewSession,
 } from "@/lib/types";
+
+const ALL_STAGE_IDS = SDLC_STAGES.map((stage) => stage.id);
+
+function relevantDesignStages(design: HarnessDesign): string[] {
+  const sdlc = (design.profile as { sdlc?: unknown }).sdlc;
+  if (!Array.isArray(sdlc)) {
+    return [];
+  }
+  return sdlc
+    .map((row) =>
+      row && typeof row === "object"
+        ? (row as { stage?: unknown }).stage
+        : undefined,
+    )
+    .filter((stage): stage is string => typeof stage === "string");
+}
 
 function recommendedActionKey(status: DesignStatus): string {
   switch (status) {
@@ -150,6 +168,7 @@ export function StudioPageContent() {
                       time: formatTimestamp(interview.expires_at, locale),
                     })}
                   </span>
+                  <SdlcScope selected={interview.selected_stages ?? ALL_STAGE_IDS} />
                 </a>
               ))}
             </div>
@@ -178,6 +197,7 @@ export function StudioPageContent() {
                 <th>{t("studio.colStatus")}</th>
                 <th>{t("studio.colUpdated")}</th>
                 <th>{t("studio.colNextAction")}</th>
+                <th>{t("studio.colScope")}</th>
               </tr>
             </thead>
             <tbody>
@@ -193,6 +213,9 @@ export function StudioPageContent() {
                   </td>
                   <td>{formatTimestamp(design.updated_at, locale)}</td>
                   <td>{t(recommendedActionKey(design.status))}</td>
+                  <td>
+                    <SdlcScope selected={relevantDesignStages(design)} />
+                  </td>
                 </tr>
               ))}
             </tbody>

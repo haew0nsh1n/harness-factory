@@ -82,6 +82,23 @@ def get_build(
     return {"ok": True, "build": to_build_response(build).model_dump(mode="json")}
 
 
+@router.get("/designs/{design_id}/builds")
+def list_design_builds(
+    design_id: str,
+    actor: Actor = Depends(get_actor),
+    service: BuildService = Depends(get_build_service),
+) -> dict[str, object]:
+    builds = service.list_recent(actor.organization_id, design_id, limit=3)
+    if builds is None:
+        raise HTTPException(status_code=404, detail="design not found")
+    return {
+        "ok": True,
+        "builds": [
+            to_build_response(build).model_dump(mode="json") for build in builds
+        ],
+    }
+
+
 @router.get("/designs/{design_id}/builds/artifact")
 def download_build_artifact(
     design_id: str,

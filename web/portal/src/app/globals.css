@@ -165,9 +165,9 @@ button {
 
 .eyebrow {
   color: var(--hf-action);
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
 }
 
@@ -245,9 +245,9 @@ button {
 .workspace-heading {
   margin: 0;
   font-family: var(--hf-display);
-  font-size: clamp(1.85rem, 4vw, 3.25rem);
-  line-height: 1.08;
-  letter-spacing: -0.045em;
+  font-size: clamp(1.5rem, 2.6vw, 2.1rem);
+  line-height: 1.12;
+  letter-spacing: -0.035em;
 }
 
 .page-description {
@@ -268,7 +268,7 @@ button {
 .workspace-panel h2 {
   margin: 0;
   font-family: var(--hf-display);
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   letter-spacing: -0.025em;
 }
 
@@ -330,10 +330,10 @@ button {
   display: block;
   margin-top: 0.6rem;
   font-family: var(--hf-display);
-  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  font-size: clamp(2rem, 3.5vw, 3rem);
   font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.07em;
+  letter-spacing: -0.06em;
 }
 
 .attention-grid {
@@ -356,7 +356,7 @@ button {
 
 .attention-value {
   font-family: var(--hf-display);
-  font-size: 2rem;
+  font-size: 1.65rem;
   font-weight: 700;
   line-height: 1;
 }
@@ -559,8 +559,8 @@ button {
 
 .interview-workspace-header h2 {
   font-family: var(--hf-display);
-  font-size: 1.35rem;
-  letter-spacing: -0.035em;
+  font-size: 1.2rem;
+  letter-spacing: -0.03em;
 }
 
 .workspace-boundary {
@@ -661,7 +661,7 @@ button {
 .conversation-surface {
   display: grid;
   min-height: 245px;
-  align-content: center;
+  align-content: start;
 }
 
 .unavailable-state {
@@ -677,9 +677,9 @@ button {
 .unavailable-state h3 {
   margin-bottom: 0.7rem;
   font-family: var(--hf-display);
-  font-size: clamp(1.35rem, 3vw, 2.15rem);
-  line-height: 1.14;
-  letter-spacing: -0.04em;
+  font-size: clamp(1.2rem, 2.2vw, 1.65rem);
+  line-height: 1.16;
+  letter-spacing: -0.03em;
 }
 
 .unavailable-state p:last-child {
@@ -1139,21 +1139,33 @@ td a:hover {
 }
 
 .operation-status {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 50;
   display: flex;
+  flex-direction: column;
   gap: 0.6rem;
-  align-items: baseline;
+  align-items: center;
+  justify-content: center;
+  max-width: min(90vw, 26rem);
   margin: 0;
-  padding: 0.85rem 1rem;
-  border-left: 4px solid var(--hf-action);
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--hf-border);
+  border-radius: 0.6rem;
   background: var(--hf-info-bg);
   color: var(--hf-info-fg);
-  font-size: 0.84rem;
+  text-align: center;
+  font-size: 0.9rem;
   font-weight: 700;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
 }
 
 .operation-dots {
   color: var(--hf-action);
   font-family: var(--hf-mono);
+  font-size: 1.4rem;
   letter-spacing: 0.16em;
   animation: operation-pulse 1.4s ease-in-out infinite;
 }
@@ -1162,6 +1174,134 @@ td a:hover {
   50% {
     opacity: 0.35;
   }
+}
+
+.version-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.version-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+}
+
+.sdlc-scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sdlc-scope-stage {
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--hf-border);
+  border-radius: 999px;
+  color: var(--hf-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sdlc-scope-stage[data-selected="true"] {
+  border-color: var(--hf-action);
+  background: var(--hf-action);
+  color: #fff;
+}
+
+.sdlc-scope-stage[data-selected="true"] span {
+  color: #fff !important;
+}
+
+.help-flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.help-flow-step {
+  position: relative;
+  flex: 1 1 150px;
+  min-width: 150px;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--hf-border);
+  border-radius: 0.5rem;
+  background: var(--hf-surface);
+}
+
+.help-flow-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--hf-action);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.help-flow-label {
+  display: block;
+  margin-top: 0.5rem;
+  font-weight: 800;
+}
+
+.help-flow-desc {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--hf-muted);
+  font-size: 0.82rem;
+}
+
+.help-flow-step:not(:last-child)::after {
+  content: "\2192";
+  position: absolute;
+  right: -0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--hf-action);
+  font-weight: 800;
+}
+
+.help-role-note {
+  margin-top: 1rem;
+}
+
+.help-subheading {
+  margin: 1.25rem 0 0.5rem;
+  font-family: var(--hf-display);
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.help-role-list {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--hf-muted);
+  font-size: 0.9rem;
+}
+
+.sidebar-help-link {
+  display: block;
+  margin-top: 0.75rem;
+  color: var(--hf-action);
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .privacy-notice {
@@ -2070,7 +2210,7 @@ button:disabled {
   }
 
   .workspace-heading {
-    font-size: 1.75rem;
+    font-size: 1.4rem;
   }
 
   .status-overview {

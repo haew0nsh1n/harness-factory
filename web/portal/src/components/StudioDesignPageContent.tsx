@@ -6,6 +6,7 @@ import { JsonEditor } from "@/components/JsonEditor";
 import { RegistryPublishPanel } from "@/components/RegistryPublishPanel";
 import { StatusBadge } from "@/components/StatusBadge";
 import { AgentFlowPanel } from "@/components/studio/AgentFlowPanel";
+import { BuildVersionList } from "@/components/studio/BuildVersionList";
 import { DebugJsonDisclosure } from "@/components/studio/DebugJsonDisclosure";
 import {
   InterviewWorkspace,
@@ -95,7 +96,7 @@ function canReview(status: DesignStatus): boolean {
 }
 
 function canBuild(status: DesignStatus): boolean {
-  return ["approved", "built", "failed"].includes(status);
+  return ["approved", "failed"].includes(status);
 }
 
 function formatFinding(findings: ValidationFinding[] | null): string[] {
@@ -273,6 +274,7 @@ export function StudioDesignPageContent({
   const [design, setDesign] = useState<HarnessDesign | null>(null);
   const [documents, setDocuments] = useState<DraftDocuments | null>(null);
   const [build, setBuild] = useState<BuildJob | null>(null);
+  const [builds, setBuilds] = useState<BuildJob[]>([]);
   const [activeTab, setActiveTab] = useState<StudioTabKey>("profile");
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -312,6 +314,20 @@ export function StudioDesignPageContent({
             }
           } catch {
             // The saved snapshot remains visible; saves still use the server-owned snapshot.
+          }
+          try {
+            const recent = await api<BuildJob[]>(`/designs/${designId}/builds`);
+            if (active) {
+              setBuilds(recent);
+              const current =
+                recent.find((item) => item.design_digest === loaded.digest) ??
+                recent[0];
+              if (current) {
+                setBuild(current);
+              }
+            }
+          } catch {
+            // Recent build versions are best-effort; artifact download still works.
           }
         }
       } catch (cause) {
@@ -572,6 +588,10 @@ export function StudioDesignPageContent({
         },
       });
       setBuild(queued);
+      setBuilds((current) => [
+        queued,
+        ...current.filter((item) => item.id !== queued.id),
+      ]);
       setDesign((current) =>
         current ? { ...current, status: "build-queued" } : current,
       );
@@ -872,6 +892,8 @@ export function StudioDesignPageContent({
               </p>
             ) : null}
           </section>
+
+          <BuildVersionList builds={builds} />
 
           <section className="workspace-panel">
             <p className="eyebrow">{t("studioDesign.serverValidationEyebrow")}</p>
