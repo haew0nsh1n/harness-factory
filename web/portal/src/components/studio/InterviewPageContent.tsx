@@ -904,6 +904,7 @@ export function InterviewPageContent({
         <InterviewWorkspace
         title={session.name}
         stage={session.stage}
+        stageHighlight={selectedStagesFor(session)}
         evidence={evidence}
         onConfirm={
           mutationBusy ? undefined : (id) => void decideEvidence(id, "confirm")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import os
 import shutil
@@ -10,6 +11,11 @@ from typing import BinaryIO, Protocol
 
 from harness_factory.contracts import no_symlinks
 from harness_factory.errors import ValidationError
+
+# Mounts such as Azure Files (SMB) reject hardlinks; fall back to a rename create.
+_LINK_UNSUPPORTED_ERRNOS = frozenset(
+    {errno.EPERM, errno.ENOSYS, errno.EOPNOTSUPP, errno.EXDEV}
+)
 
 
 @dataclass(frozen=True)
@@ -90,9 +96,8 @@ class FileArtifactStorage:
 
             scratch_path = _normalize_path(Path(temporary_path))
             source_digest, source_size = _digest_file(scratch_path)
-            try:
-                os.link(scratch_path, destination)
-            except FileExistsError:
+
+            def _dedup_or_conflict() -> StoredArtifact:
                 existing_digest, existing_size = _digest_file(destination)
                 if (
                     existing_digest == source_digest
@@ -104,6 +109,18 @@ class FileArtifactStorage:
                         size=existing_size,
                     )
                 raise ArtifactConflict("artifact already exists with different bytes")
+
+            try:
+                os.link(scratch_path, destination)
+            except FileExistsError:
+                return _dedup_or_conflict()
+            except OSError as link_exc:
+                if link_exc.errno not in _LINK_UNSUPPORTED_ERRNOS:
+                    raise
+                if destination.exists():
+                    return _dedup_or_conflict()
+                os.replace(scratch_path, destination)
+                temporary_path = None
 
             return StoredArtifact(
                 key=relative.as_posix(),

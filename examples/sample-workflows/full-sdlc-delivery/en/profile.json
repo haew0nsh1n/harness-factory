@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "customer_id": "fictional-full-sdlc",
+  "name": "Fictional customer - full SDLC sample",
+  "sdlc": [
+    {"stage": "discovery", "current": "Work starts while the issue's requirements and acceptance criteria are unclear.", "desired": "Produce a verifiable brief through clarification questions."},
+    {"stage": "planning", "current": "Planning sometimes begins without approval.", "desired": "Turn only the approved brief scope into an execution plan."},
+    {"stage": "implementation", "current": "Changes drift outside the plan scope and cause rework.", "desired": "Implement minimal test-first changes within the plan scope."},
+    {"stage": "testing", "current": "Test execution and result recording are inconsistent.", "desired": "Record failing, passing, and regression test results as observed facts."},
+    {"stage": "review", "current": "Change intent and test evidence are separated, causing review gaps.", "desired": "Read the implementation together with actual test results and report important defects with evidence."},
+    {"stage": "release", "current": "After review, publication responsibility and resume evidence are unclear.", "desired": "An explicit human maintainer approves, then creates the PR through the existing process and provides the URL."},
+    {"stage": "operations", "current": "The post-publication follow-up procedure is undocumented.", "desired": "Keep the PR URL and reviewed-change match as resume evidence and mark remote status as unverified."}
+  ],
+  "glossary": {
+    "brief": "A draft capturing the goal, scope, constraints, and acceptance criteria confirmed from the issue",
+    "plan": "An execution plan including implementation files, verification methods, and stop conditions",
+    "implementation": "The local changes made within the plan scope and their intent",
+    "test-results": "The actually observed failing, passing, and regression test results",
+    "review-report": "A read-only report separating requirements, defects, test evidence, and unverified items",
+    "pr-url": "The URL of the PR the maintainer created manually and the reviewed-change confirmation"
+  },
+  "systems": [
+    {"id": "issue-store", "kind": "git-markdown-issue-tracker", "tool": "git", "capabilities": ["issue-read"]}
+  ],
+  "issue_tracker": {
+    "system_id": "issue-store",
+    "provider": "markdown",
+    "connection": "local",
+    "project": "fictional-project",
+    "path": "issues",
+    "skill": null,
+    "mcp": null,
+    "capabilities": ["issue-read"]
+  },
+  "roles": ["consultant", "product-owner", "engineer", "reviewer", "maintainer"],
+  "pains": [
+    {"description": "Clarification, planning, implementation, review, and publication are disconnected, causing rework and publication incidents.", "impact": "Scope changes repeatedly and publication responsibility is ambiguous.", "frequency": "A fictional example; the real frequency is not confirmed."}
+  ],
+  "success_criteria": [
+    "Each stage's artifact moves to the next stage only after approval.",
+    "Publication happens only with the maintainer's prior approval and direct action.",
+    "Test results and resume evidence remain observed facts."
+  ],
+  "constraints": [
+    "Fictional customer information; real tool access and permissions are not confirmed.",
+    "This sample does not perform automated publishing, merging, or deployment."
+  ],
+  "facts": [
+    {"id": "fictional-source", "statement": "The sample content is fictional material for explaining product behavior.", "evidence": "A development fixture included in the repository"}
+  ],
+  "assumptions": ["At run time the issue body is provided or approved local reads are available."],
+  "unknowns": ["The real customer's issue format, repository path, and approvers are not confirmed."]
+}

@@ -630,6 +630,9 @@ describe("StudioDesignPageContent", () => {
       target: { value: "TEAM" },
     });
     openTab("워크플로우");
+    fireEvent.click(
+      screen.getByRole("button", { name: /Clarify acceptance criteria/ }),
+    );
     fireEvent.change(screen.getByLabelText("clarify 단계 승인 시점"), {
       target: { value: "before" },
     });

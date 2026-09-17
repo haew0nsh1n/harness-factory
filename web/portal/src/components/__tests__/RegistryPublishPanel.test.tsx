@@ -75,11 +75,27 @@ describe("RegistryPublishPanel", () => {
     vi.restoreAllMocks();
   });
 
-  test("is hidden before the design is built", () => {
+  test("shows a not-built notice and disables version creation before the design is built", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          actor: {
+            organization_id: "org-acme",
+            subject_id: "consultant-42",
+            roles: ["author", "reviewer", "registry-admin"],
+          },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ ok: true, items: [] }));
+
     render(<RegistryPublishPanel design={designFixture("approved")} />);
+
     expect(
-      screen.queryByRole("heading", { name: "레지스트리 등록" }),
-    ).not.toBeInTheDocument();
+      await screen.findByRole("heading", { name: "레지스트리 등록" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/아직 빌드되지 않았습니다/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "버전 생성" })).toBeDisabled();
   });
 
   test("loads built defaults and creates the asset with the current actor", async () => {

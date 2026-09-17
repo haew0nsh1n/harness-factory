@@ -20,8 +20,32 @@ export const en: Messages = {
   help: {
     eyebrow: "Getting started",
     heading: "How Harness Factory works",
-    intro: "The flow runs from the interview to publishing and installing the workflow artifact.",
+    intro: "Harness Factory interviews customers to understand their existing SDLC, engineering culture, bottlenecks, and goals, generates a skill-based, AI-native development workflow tailored to each customer's context, and spreads it as a reusable asset across the organization.",
+    overviewAlt: "Harness Factory overview diagram",
+    flowIntro: "Harness Factory runs in the following steps.",
     flowAria: "Workflow steps",
+    concept: {
+      eyebrow: "Harness composition",
+      heading: "A harness asset set planted in your repository",
+      intro: "Harness Factory does more than copy a skill. It plants a harness asset set that drives the SDLC, tailored to the customer's context. The assets are organized along four axes.",
+      spec: {
+        label: "Spec",
+        desc: "Workflow goal, trigger, steps, and requirement traceability — what the agent must do.",
+      },
+      context: {
+        label: "Context (repository guidance)",
+        desc: "Customer profile (SDLC, roles, systems, glossary) and approved customer rules placed as in-repo guidance.",
+      },
+      execution: {
+        label: "Execution",
+        desc: "Skills, tool/MCP bindings, and roles/approval gates that carry out the work.",
+      },
+      verify: {
+        label: "Verify",
+        desc: "Scenario simulation, review/test skills, evaluation receipts, and approval gates that check the outcome.",
+      },
+      note: "Planted assets are integrity-locked by a manifest that hashes every file. Wiring a literal CI pipeline is out of scope; gating is expressed through approvals, evaluation, and the registry lifecycle.",
+    },
     steps: {
       interview: {
         label: "Interview",
@@ -75,7 +99,7 @@ export const en: Messages = {
     },
   },
   footer: {
-    devBadge: "Using development identity",
+    devBadge: "Role: developer",
     signOut: "Sign out",
   },
   dashboard: {
@@ -176,6 +200,9 @@ export const en: Messages = {
     aria: "SDLC scope",
     included: "Selected",
     excluded: "Not selected",
+  },
+  lifecycle: {
+    aria: "Design progress",
   },
   registry: {
     eyebrow: "Asset Registry",
@@ -290,7 +317,7 @@ export const en: Messages = {
     interviewUnavailableTitle: "The conversational interview is not available yet.",
     interviewUnavailableBody: "This screen only shows the actual profile evidence of the saved design. Question generation and answer storage are connected with the server interview model in stage 3.",
     composerDisabledTitle: "Answer input unavailable",
-    composerDisabledBody: "You can continue reviewing and saving the current design in the JSON editor below.",
+    composerDisabledBody: "You can continue reviewing and saving the current design in the JSON editor in the Advanced tab.",
     structuredError: "This JSON format cannot update the structured form. Open the debug JSON to fix the errors. The existing form state and original values are preserved and not saved.",
     buildEyebrow: "Build",
     buildStatusHeading: "Build status",
@@ -370,6 +397,7 @@ export const en: Messages = {
     versionRecovered: "The existing version {version} matches the current design and was reloaded.",
     recoverFailed: "Failed to recheck the existing version after the creation conflict. Check the asset list and manifest, then try again.",
     needBuiltVersion: "A built design and a valid SemVer version are required.",
+    needBuiltNotice: "This design has not been built yet. You can prepare the asset below, but version creation, review, and publishing require a completed build.",
     versionCreated: "Version created",
     createVersionFailed: "Failed to create the version. Check the design build status and version number.",
     versionApproved: "Registry version approved",
@@ -769,7 +797,7 @@ export const en: Messages = {
     deleteNote: "Deletes the conversation and unapplied proposals. Designs already applied are kept.",
     deletePermanently: "Delete interview permanently",
     cancel: "Cancel",
-    confirmDelete: "Confirm delete",
+    confirmDelete: "Delete",
   },
   formValidation: {
     notString: "The current value must be a string. The original value in the advanced JSON is preserved.",
@@ -796,6 +824,12 @@ export const en: Messages = {
     manualObjectOrNull: "Manual handoff must be an object or null.",
     scenarioMode: "Only the read-only-agent-simulation mode is allowed.",
     expectChoice: "Select an allowed expected state.",
+  },
+  flowEdit: {
+    edit: "Edit",
+    close: "Close",
+    done: "Done",
+    empty: "No items yet. Use the add button above to create one.",
   },
   locale: {
     label: "Language",

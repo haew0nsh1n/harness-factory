@@ -17,9 +17,33 @@ export const ko = {
   },
   help: {
     eyebrow: "사용 안내",
-    heading: "Harness Factory 사용법",
-    intro: "인터뷰에서 시작해 워크플로우 산출물 게시·설치까지 이어지는 흐름입니다.",
+    heading: "Harness Factory 개요",
+    intro: "Harness Factory는 고객 인터뷰를 통해 기존 SDLC, 개발 문화, 병목과 목표를 파악하고 고객 맥락에 맞는 스킬 기반 AI-native 개발 워크플로우를 생성해 조직 내 재사용 가능한 자산으로 확산하는 프로젝트입니다.",
+    overviewAlt: "Harness Factory 개요 다이어그램",
+    flowIntro: "Harness Factory는 아래 단계로 수행됩니다.",
     flowAria: "작업 흐름",
+    concept: {
+      eyebrow: "하네스 구성",
+      heading: "저장소에 심는 하네스 자산 세트",
+      intro: "Harness Factory는 스킬만 복사하지 않습니다. 고객 맥락에 맞춰 SDLC를 움직이는 하네스 자산 세트를 저장소에 심습니다. 자산은 네 축으로 구성됩니다.",
+      spec: {
+        label: "Spec (명세)",
+        desc: "워크플로우 목표·트리거·단계와 요구사항 추적(traceability). 에이전트가 무엇을 해야 하는지 정의합니다.",
+      },
+      context: {
+        label: "Context (맥락·저장소 지침)",
+        desc: "고객 프로필(SDLC·역할·시스템·용어)과 승인된 고객 규칙을 저장소 지침으로 배치합니다.",
+      },
+      execution: {
+        label: "Execution (실행)",
+        desc: "스킬, 툴·MCP 바인딩, 역할·승인 게이트로 실제 작업을 수행합니다.",
+      },
+      verify: {
+        label: "Verify (검증)",
+        desc: "시나리오 시뮬레이션, 리뷰·테스트 스킬, 평가 리시트와 승인 게이트로 결과를 검증합니다.",
+      },
+      note: "심어진 자산은 매니페스트가 모든 파일을 해시로 무결성 고정합니다. 실제 CI 파이프라인 자동 배선은 범위 밖이며, 품질 게이트는 승인·평가·레지스트리 라이프사이클로 표현됩니다.",
+    },
     steps: {
       interview: {
         label: "인터뷰",
@@ -67,13 +91,13 @@ export const ko = {
       clarify: { name: "hf-clarify", desc: "이슈를 승인된 브리프로 정리" },
       plan: { name: "hf-plan", desc: "브리프를 테스트 우선 계획으로" },
       tdd: { name: "hf-tdd", desc: "red-green-refactor 구현과 실행 증거" },
-      review: { name: "hf-review", desc: "읽기전용 의도·정확성 리뷰" },
+      review: { name: "hf-review", desc: "읽기 전용 의도·정확성 리뷰" },
       manual: { name: "hf-manual", desc: "담당자를 명시한 사람 인계" },
       issues: { name: "hf-issues-markdown", desc: "이슈당 Git 추적 Markdown 파일 관리" },
     },
   },
   footer: {
-    devBadge: "개발 환경 ID 사용 중",
+    devBadge: "권한: 개발자",
     signOut: "로그아웃",
   },
   dashboard: {
@@ -173,6 +197,9 @@ export const ko = {
     aria: "SDLC 범위",
     included: "선택됨",
     excluded: "미선택",
+  },
+  lifecycle: {
+    aria: "디자인 진행 단계",
   },
   registry: {
     eyebrow: "Asset Registry",
@@ -287,7 +314,7 @@ export const ko = {
     interviewUnavailableTitle: "대화형 인터뷰는 아직 제공되지 않습니다.",
     interviewUnavailableBody: "이 화면은 저장된 디자인의 실제 프로필 근거만 보여 줍니다. 질문 생성과 답변 저장은 3단계에서 서버 인터뷰 모델과 함께 연결됩니다.",
     composerDisabledTitle: "답변 입력 미제공",
-    composerDisabledBody: "현재 디자인은 아래 JSON 편집기에서 계속 검토하고 저장할 수 있습니다.",
+    composerDisabledBody: "현재 디자인은 고급 탭의 JSON 편집기에서 계속 검토하고 저장할 수 있습니다.",
     structuredError: "구조화된 양식을 갱신할 수 없는 JSON 형식입니다. 디버그 JSON을 열어 오류를 수정하세요. 기존 양식 상태와 원본 값은 유지되며 저장되지 않습니다.",
     buildEyebrow: "빌드",
     buildStatusHeading: "빌드 상태",
@@ -335,7 +362,7 @@ export const ko = {
     cycle: "순환 의존: {cycle}",
     simEyebrow: "커버리지",
     simHeading: "시나리오 커버리지",
-    simHint: "기대 종료 상태별로 시나리오를 묶어 보여 줍니다. 칩을 클릭하면 상황·금지 항목과 스텝 진행을 폴칩니다. 실제 모델 호출은 없습니다.",
+    simHint: "기대 종료 상태별로 시나리오를 묶어 보여 줍니다. 칩을 클릭하면 상황·금지 항목과 스텝 진행을 펼칩니다. 실제 모델 호출은 없습니다.",
     noScenarios: "표시할 시나리오 또는 단계가 없습니다.",
     forbiddenLabel: "금지: {forbidden}",
     violation: "금지 항목 충돌",
@@ -364,6 +391,7 @@ export const ko = {
     versionRecovered: "기존 {version} 버전이 현재 디자인과 일치해 다시 불러왔습니다.",
     recoverFailed: "버전 생성 충돌 후 기존 버전을 다시 확인하지 못했습니다. 자산 목록과 매니페스트를 확인한 뒤 재시도하세요.",
     needBuiltVersion: "빌드된 디자인과 올바른 SemVer 버전이 필요합니다.",
+    needBuiltNotice: "이 디자인은 아직 빌드되지 않았습니다. 아래에서 자산은 미리 준비할 수 있지만, 버전 생성·리뷰·게시는 빌드를 완료한 뒤 진행됩니다.",
     versionCreated: "버전 생성 완료",
     createVersionFailed: "버전을 생성하지 못했습니다. 디자인 빌드 상태와 버전 번호를 확인해 주세요.",
     versionApproved: "레지스트리 버전 승인 완료",
@@ -763,7 +791,7 @@ export const ko = {
     deleteNote: "대화와 미적용 제안을 삭제합니다. 이미 적용한 디자인은 유지됩니다.",
     deletePermanently: "인터뷰 영구 삭제",
     cancel: "취소",
-    confirmDelete: "삭제 확인",
+    confirmDelete: "삭제",
   },
   formValidation: {
     notString: "현재 값은 문자열이어야 합니다. 고급 JSON의 원본 값은 유지됩니다.",
@@ -790,6 +818,12 @@ export const ko = {
     manualObjectOrNull: "수동 인계는 객체 또는 null이어야 합니다.",
     scenarioMode: "read-only-agent-simulation 모드만 허용됩니다.",
     expectChoice: "허용된 예상 상태를 선택하세요.",
+  },
+  flowEdit: {
+    edit: "수정",
+    close: "닫기",
+    done: "완료",
+    empty: "표시할 항목이 없습니다. 위의 추가 버튼으로 단계를 만드세요.",
   },
   locale: {
     label: "언어",

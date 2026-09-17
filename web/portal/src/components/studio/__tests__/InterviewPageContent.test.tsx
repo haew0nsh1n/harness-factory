@@ -1023,7 +1023,7 @@ describe("InterviewPageContent lifecycle", () => {
     );
     await screen.findByText("어디에서 작업이 가장 오래 멈추나요?");
 
-    fireEvent.click(screen.getByRole("button", { name: "삭제 확인" }));
+    fireEvent.click(screen.getByRole("button", { name: "삭제" }));
     fireEvent.click(screen.getByRole("button", { name: "인터뷰 영구 삭제" }));
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith("/studio"));

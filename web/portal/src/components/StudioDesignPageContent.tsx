@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { AgentFlowPanel } from "@/components/studio/AgentFlowPanel";
 import { BuildVersionList } from "@/components/studio/BuildVersionList";
 import { DebugJsonDisclosure } from "@/components/studio/DebugJsonDisclosure";
+import { DesignLifecycle } from "@/components/studio/DesignLifecycle";
 import {
   InterviewWorkspace,
   type EvidenceItem,
@@ -56,8 +57,8 @@ const STUDIO_TABS: ReadonlyArray<{ key: StudioTabKey; labelKey: string }> = [
   { key: "scenarios", labelKey: "studioDesign.tabScenarios" },
   { key: "agent", labelKey: "studioDesign.tabAgent" },
   { key: "catalog", labelKey: "studioDesign.tabCatalog" },
-  { key: "publish", labelKey: "studioDesign.tabPublish" },
   { key: "build", labelKey: "studioDesign.tabBuild" },
+  { key: "publish", labelKey: "studioDesign.tabPublish" },
   { key: "debug", labelKey: "studioDesign.tabDebug" },
 ];
 
@@ -85,18 +86,6 @@ function buildStatusFromDesign(status: DesignStatus): string | null {
     default:
       return null;
   }
-}
-
-function canValidate(status: DesignStatus): boolean {
-  return status === "draft";
-}
-
-function canReview(status: DesignStatus): boolean {
-  return status === "validated";
-}
-
-function canBuild(status: DesignStatus): boolean {
-  return ["approved", "failed"].includes(status);
 }
 
 function formatFinding(findings: ValidationFinding[] | null): string[] {
@@ -384,6 +373,19 @@ export function StudioDesignPageContent({
     () => (design ? evidenceFromProfile(design.profile) : []),
     [design],
   );
+  const sdlcStages = useMemo(() => {
+    const sdlc = design?.profile?.sdlc;
+    if (!Array.isArray(sdlc)) {
+      return [];
+    }
+    return sdlc.flatMap((entry) =>
+      entry &&
+      typeof entry === "object" &&
+      typeof (entry as { stage?: unknown }).stage === "string"
+        ? [(entry as { stage: string }).stage]
+        : [],
+    );
+  }, [design]);
   const structuredDocuments = useMemo<DesignDocuments | null>(() => {
     if (!documents) {
       return null;
@@ -670,48 +672,15 @@ export function StudioDesignPageContent({
           <span>{t("studioDesign.currentDigest")}</span>
           <code className="digest-text">{design.digest}</code>
         </div>
-        <div className="actions-row">
-          <button
-            className="button-primary"
-            type="button"
-            onClick={() => void saveDraft()}
-            disabled={saving}
-          >
-            {t("studioDesign.saveDraftBtn")}
-          </button>
-          <button
-            className="button-secondary"
-            type="button"
-            onClick={() => void validateDesign()}
-            disabled={saving || !canValidate(design.status)}
-          >
-            {t("studioDesign.validateBtn")}
-          </button>
-          <button
-            className="button-secondary"
-            type="button"
-            onClick={() => void reviewDesign("approved")}
-            disabled={saving || !canReview(design.status)}
-          >
-            {t("studioDesign.approveDigestBtn")}
-          </button>
-          <button
-            className="button-secondary"
-            type="button"
-            onClick={() => void reviewDesign("rejected")}
-            disabled={saving || !canReview(design.status)}
-          >
-            {t("studioDesign.rejectReviewBtn")}
-          </button>
-          <button
-            className="button-secondary"
-            type="button"
-            onClick={() => void queueBuild()}
-            disabled={saving || !canBuild(design.status)}
-          >
-            {t("studioDesign.requestBuildBtn")}
-          </button>
-        </div>
+        <DesignLifecycle
+          status={design.status}
+          saving={saving}
+          onSaveDraft={() => void saveDraft()}
+          onValidate={() => void validateDesign()}
+          onApprove={() => void reviewDesign("approved")}
+          onReject={() => void reviewDesign("rejected")}
+          onBuild={() => void queueBuild()}
+        />
         {error ? <p className="error-text">{error}</p> : null}
         {staleConflict ? (
           <div className="conflict-actions">
@@ -782,6 +751,7 @@ export function StudioDesignPageContent({
         <InterviewWorkspace
           title={t("studioDesign.evidenceTitle", { name: design.name })}
           stage="unavailable"
+          stageHighlight={sdlcStages}
           evidence={profileEvidence}
           conversation={
             <div className="unavailable-state">

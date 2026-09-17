@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@/i18n/I18nProvider";
+import { useLocale, useTranslations } from "@/i18n/I18nProvider";
 
 const STEPS = [
   "interview",
@@ -10,6 +10,8 @@ const STEPS = [
   "registry",
   "install",
 ] as const;
+
+const CONCEPTS = ["spec", "context", "execution", "verify"] as const;
 
 const SKILLS = [
   { key: "clarify", io: "issue → brief", repo: "mattpocock/skills", url: "https://github.com/mattpocock/skills", license: "MIT" },
@@ -22,6 +24,7 @@ const SKILLS = [
 
 export function HelpPageContent() {
   const t = useTranslations();
+  const locale = useLocale();
   return (
     <div className="page-stack">
       <header className="page-intro">
@@ -29,7 +32,13 @@ export function HelpPageContent() {
         <h1 className="workspace-heading">{t("help.heading")}</h1>
         <p className="page-description">{t("help.intro")}</p>
       </header>
-      <section className="workspace-panel">
+      <section className="workspace-panel help-overview">
+        <img
+          className="help-overview-image"
+          src={`/help/overview-${locale}.png`}
+          alt={t("help.overviewAlt")}
+        />
+        <p className="page-description">{t("help.flowIntro")}</p>
         <ol className="help-flow" aria-label={t("help.flowAria")}>
           {STEPS.map((step, index) => (
             <li className="help-flow-step" key={step}>
@@ -50,6 +59,20 @@ export function HelpPageContent() {
           <li>{t("help.roles.reviewer")}</li>
           <li>{t("help.roles.registryAdmin")}</li>
         </ul>
+      </section>
+      <section className="workspace-panel">
+        <p className="eyebrow">{t("help.concept.eyebrow")}</p>
+        <h2>{t("help.concept.heading")}</h2>
+        <p className="page-description">{t("help.concept.intro")}</p>
+        <div className="help-concept-grid">
+          {CONCEPTS.map((concept) => (
+            <div className="help-concept-card" key={concept}>
+              <h3>{t(`help.concept.${concept}.label`)}</h3>
+              <p>{t(`help.concept.${concept}.desc`)}</p>
+            </div>
+          ))}
+        </div>
+        <p className="muted help-concept-note">{t("help.concept.note")}</p>
       </section>
       <section className="workspace-panel">
         <p className="eyebrow">{t("help.skillsSection.eyebrow")}</p>

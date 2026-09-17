@@ -7,7 +7,7 @@ describe("HelpPageContent", () => {
     render(<HelpPageContent />);
 
     expect(
-      screen.getByRole("heading", { name: "Harness Factory 사용법" }),
+      screen.getByRole("heading", { name: "Harness Factory 개요" }),
     ).toBeInTheDocument();
 
     const flow = screen.getByRole("list", { name: "작업 흐름" });
