@@ -1,0 +1,3 @@
+# Skill bundle resources are hashed with LF newlines; force LF on all platforms
+# so the container build context matches each catalog/skills/*/bundle.json.
+catalog/skills/** text eol=lf
