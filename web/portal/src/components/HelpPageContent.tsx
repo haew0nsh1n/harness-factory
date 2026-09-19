@@ -26,7 +26,7 @@ export function HelpPageContent() {
   const t = useTranslations();
   const locale = useLocale();
   return (
-    <div className="page-stack">
+    <div className="page-stack help-page">
       <header className="page-intro">
         <p className="eyebrow">{t("help.eyebrow")}</p>
         <h1 className="workspace-heading">{t("help.heading")}</h1>

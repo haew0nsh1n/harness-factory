@@ -89,6 +89,48 @@ button {
   min-height: 100vh;
 }
 
+.app-shell--collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell--collapsed .sidebar {
+  display: none;
+}
+
+.app-shell--collapsed .main-content {
+  max-width: none;
+}
+
+.sidebar-toggle {
+  position: fixed;
+  top: 0.85rem;
+  left: calc(224px - 1.1rem);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border: 1px solid var(--hf-border);
+  border-radius: 999px;
+  background: var(--hf-surface);
+  color: var(--hf-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  transition: left 0.15s ease;
+}
+
+.sidebar-toggle:hover {
+  border-color: var(--hf-action);
+  color: var(--hf-action);
+}
+
+.app-shell--collapsed .sidebar-toggle {
+  left: 0.6rem;
+}
+
 .sidebar {
   position: sticky;
   top: 0;
@@ -235,6 +277,11 @@ button {
 .page-intro {
   max-width: 760px;
   padding: 0.5rem 0 1rem;
+}
+
+.help-page .page-intro,
+.help-page .page-description {
+  max-width: none;
 }
 
 .help-philosophy {
@@ -2487,6 +2534,14 @@ button:disabled {
 
 @media (max-width: 720px) {
   .app-shell {
+    display: block;
+  }
+
+  .sidebar-toggle {
+    display: none;
+  }
+
+  .app-shell--collapsed .sidebar {
     display: block;
   }
 

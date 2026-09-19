@@ -17,6 +17,8 @@ export const en: Messages = {
     registry: "Registry",
     help: "Help",
     settings: "Settings",
+    collapse: "Collapse menu",
+    expand: "Expand menu",
   },
   help: {
     eyebrow: "Getting started",
