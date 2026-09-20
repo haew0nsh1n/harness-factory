@@ -789,7 +789,7 @@ export const ko = {
     reloadTargetDesign: "대상 디자인 다시 불러오기",
     reviewSummary: "제안 {digest}, 워크플로우 범위 {scope}, 위 대상 다이제스트를 함께 검토했습니다. 이는 이후 디자인 승인과 다릅니다.",
     scopeUnselected: "미선택",
-    applyExactProposal: "정확한 제안 적용",
+    applyExactProposal: "디자인 등록",
     retentionEyebrow: "보존 관리",
     deleteHeading: "인터뷰 삭제",
     deleteNote: "대화와 미적용 제안을 삭제합니다. 이미 적용한 디자인은 유지됩니다.",

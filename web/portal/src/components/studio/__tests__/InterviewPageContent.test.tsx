@@ -678,6 +678,21 @@ describe("InterviewPageContent lifecycle", () => {
     ).toBe(false);
   });
 
+  test("shows the proposal action instead of the answer composer after completion", async () => {
+    installLoadedSession({
+      ...session,
+      status: "completed",
+      proposed_evidence: [],
+    });
+
+    render(<InterviewPageContent interviewId="interview-1" />);
+
+    expect(
+      await screen.findByRole("button", { name: "디자인 제안 생성" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("답변")).not.toBeInTheDocument();
+  });
+
   test("binds confirmation to the exact proposal, scope, and target digest", async () => {
     const completed = {
       ...session,
@@ -704,7 +719,7 @@ describe("InterviewPageContent lifecycle", () => {
     });
     fireEvent.click(confirmation);
     expect(
-      screen.getByRole("button", { name: "정확한 제안 적용" }),
+      screen.getByRole("button", { name: "디자인 등록" }),
     ).toBeEnabled();
 
     fireEvent.change(screen.getByLabelText("적용 대상"), {
@@ -712,7 +727,7 @@ describe("InterviewPageContent lifecycle", () => {
     });
     expect(confirmation).not.toBeChecked();
     expect(
-      screen.getByRole("button", { name: "정확한 제안 적용" }),
+      screen.getByRole("button", { name: "디자인 등록" }),
     ).toBeDisabled();
     expect(screen.getByText(design.digest)).toBeInTheDocument();
   });
@@ -765,7 +780,7 @@ describe("InterviewPageContent lifecycle", () => {
     await screen.findByText(/워크플로우 범위 release-handoff/);
     expect(confirmation).not.toBeChecked();
     expect(
-      screen.getByRole("button", { name: "정확한 제안 적용" }),
+      screen.getByRole("button", { name: "디자인 등록" }),
     ).toBeDisabled();
   });
 
@@ -810,7 +825,7 @@ describe("InterviewPageContent lifecycle", () => {
       name: /제안 aaaaaaaaaaaa/,
     });
     fireEvent.click(confirmation);
-    fireEvent.click(screen.getByRole("button", { name: "정확한 제안 적용" }));
+    fireEvent.click(screen.getByRole("button", { name: "디자인 등록" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "대상 디자인이 검토 후 변경되었습니다",
@@ -829,7 +844,7 @@ describe("InterviewPageContent lifecycle", () => {
       screen.getByRole("button", { name: "대상 디자인 다시 불러오기" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "정확한 제안 적용" }),
+      screen.getByRole("button", { name: "디자인 등록" }),
     ).toBeDisabled();
 
     fireEvent.click(
@@ -894,7 +909,7 @@ describe("InterviewPageContent lifecycle", () => {
       name: /제안 aaaaaaaaaaaa/,
     });
     fireEvent.click(confirmation);
-    fireEvent.click(screen.getByRole("button", { name: "정확한 제안 적용" }));
+    fireEvent.click(screen.getByRole("button", { name: "디자인 등록" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "적용 대상 디자인을 찾을 수 없습니다",

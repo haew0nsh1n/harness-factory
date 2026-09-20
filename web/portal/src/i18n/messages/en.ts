@@ -795,7 +795,7 @@ export const en: Messages = {
     reloadTargetDesign: "Reload the target design",
     reviewSummary: "Reviewed proposal {digest}, workflow scope {scope}, and the target digest above together. This differs from later design approval.",
     scopeUnselected: "Not selected",
-    applyExactProposal: "Apply the exact proposal",
+    applyExactProposal: "Register design",
     retentionEyebrow: "Retention management",
     deleteHeading: "Delete interview",
     deleteNote: "Deletes the conversation and unapplied proposals. Designs already applied are kept.",

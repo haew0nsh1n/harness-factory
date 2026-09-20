@@ -141,7 +141,7 @@ export function InterviewWorkspace({
           </div>
         </div>
 
-        <div className="composer-surface">{composer}</div>
+        {composer ? <div className="composer-surface">{composer}</div> : null}
       </div>
     </section>
   );

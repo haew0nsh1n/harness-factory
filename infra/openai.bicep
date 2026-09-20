@@ -58,7 +58,7 @@ resource deployment 'Microsoft.CognitiveServices/accounts/deployments@2025-04-01
   name: deploymentName
   sku: {
     name: 'GlobalStandard'
-    capacity: 10
+    capacity: 30
   }
   properties: {
     model: {

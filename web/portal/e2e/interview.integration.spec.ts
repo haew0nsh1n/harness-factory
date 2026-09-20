@@ -114,7 +114,7 @@ test("real portal proxy persists proposal into the selected SQLite target", asyn
       name: new RegExp(`제안 ${digest!.slice(0, 12)}`),
     })
     .check();
-  await page.getByRole("button", { name: "정확한 제안 적용" }).click();
+  await page.getByRole("button", { name: "디자인 등록" }).click();
   await expect(page).toHaveURL(new RegExp(`/studio/${target!.id}$`));
 
   const persisted = await controlPlane<{ ok: true; design: Design }>(

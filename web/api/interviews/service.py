@@ -322,7 +322,7 @@ class InterviewService:
                     StoredTurn.session_id == session_id,
                 )
             )
-            if int(turn_count or 0) + 2 > 60:
+            if int(turn_count or 0) + 2 > 80:
                 raise InterviewConflict(
                     "turn_limit", "interview turn limit has been reached"
                 )

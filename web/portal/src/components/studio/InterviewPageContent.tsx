@@ -926,7 +926,7 @@ export function InterviewPageContent({
             ))}
           </div>
         }
-        composer={
+        composer={session.status === "completed" && !answerOperation ? null : (
           <AnswerComposer
             question={currentQuestion(session)}
             answer={answer}
@@ -951,8 +951,8 @@ export function InterviewPageContent({
                 );
               }
             }}
-            />
-        }
+          />
+        )}
       />
       </SelectedStagesProvider>
 

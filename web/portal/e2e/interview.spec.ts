@@ -304,7 +304,7 @@ for (const width of [320, 768, 1440]) {
     });
 
     await page.getByRole("checkbox", { name: /제안 aaaaaaaaaaaa/ }).check();
-    await page.getByRole("button", { name: "정확한 제안 적용" }).click();
+    await page.getByRole("button", { name: "디자인 등록" }).click();
     await expect(page).toHaveURL(/\/studio\/design-target$/);
   });
 }
