@@ -1,35 +1,38 @@
 ---
 title: Harness Factory
-description: 웹에서 SDLC 워크플로를 설계하고 Copilot CLI 하네스로 배포하는 플랫폼
+description: Design SDLC workflows on the web and deliver them as Copilot CLI harnesses
 ---
 
-Harness Factory는 고객의 SDLC 병목을 인터뷰로 파악하고, 승인된 워크플로를
-Copilot CLI용 하네스로 만드는 웹 플랫폼입니다. 스튜디오에서 워크플로를 설계하고
-검토한 뒤 레지스트리에 게시하면, 사용자는 `hf` CLI로 검증된 패키지를 설치할 수
-있습니다.
+**English** | [한국어](web/README_ko.md)
+
+Harness Factory is a web platform that identifies customer SDLC bottlenecks through
+interviews and turns approved workflows into harnesses for Copilot CLI. Authors design
+and review workflows in the studio, publish them to the registry, and install verified
+packages with the `hf` CLI.
 
 ```text
-인터뷰 → 워크플로 설계 → 검증과 승인 → 빌드 → 레지스트리 게시 → 설치
+Interview → Workflow design → Validation and approval → Build → Registry publish → Install
 ```
 
-## 주요 기능
+## Key features
 
-* 질문을 한 번에 하나씩 제시하는 SDLC 인터뷰
-* 인터뷰 결과를 바탕으로 한 워크플로 설계와 편집
-* 정확한 digest를 기준으로 한 검토와 승인
-* 격리된 worker를 통한 하네스 패키지 빌드
-* 버전별 검토, 게시, 검색, 폐기를 지원하는 레지스트리
-* 게시된 패키지를 미리 보고 적용하는 `hf` CLI
+* SDLC interviews that ask one question at a time
+* Workflow design and editing based on interview results
+* Review and approval bound to exact digests
+* Harness package builds in an isolated worker
+* Version review, publishing, search, and deprecation in the registry
+* Preview and application of published packages with the `hf` CLI
 
-기본 카탈로그에는 요구사항 확인, 계획, 테스트 기반 구현, 코드 리뷰, 수동 인계,
-Git + Markdown 이슈를 위한 스킬이 포함됩니다. 고객별 규칙은 기본 스킬을
-변경하지 않고 별도 생성 스킬로 추가됩니다.
+The default catalog includes skills for clarification, planning, test-driven
+implementation, code review, manual handoff, and Git-tracked Markdown issues.
+Customer-specific rules are added as generated skills without modifying the defaults.
 
-## 이슈 트래커 선택
+## Issue tracker selection
 
-인터뷰에서 다음 중 하나를 source of truth로 확정합니다. GitHub Issues와
-Jira는 고객이 승인한 호환 skill을 먼저 확인하고, 없으면 승인된 MCP 연결을
-선택합니다. 연결은 프로필에 고정되며 실행 중 자동 전환하지 않습니다.
+The interview establishes one of the following as the source of truth. For GitHub
+Issues and Jira, the workflow first looks for a customer-approved compatible skill,
+then uses an approved MCP connection as a fallback. The selected connection is pinned
+in the profile and never switches automatically at runtime.
 
 | Choice | Preferred connection | Fallback | Default storage |
 | --- | --- | --- | --- |
@@ -44,60 +47,76 @@ python3 -m harness_factory preflight --package PACKAGE
 python3 -m harness_factory delivery-check --package PACKAGE
 ```
 
-skill 파일이나 MCP 이름의 존재는 provider 호환성, 인증, 권한 또는 capability
-검증이 아닙니다. `/mcp` 인증은 고객의 승인된 네이티브 방식으로 수행하고
-자격 증명을 프로필이나 패키지에 저장하지 않습니다. 연결 방식을 바꾸려면
-프로필을 다시 검토하고 패키지를 재생성해야 합니다.
+A skill file or MCP name alone does not prove provider compatibility, authentication,
+authorization, or capabilities. Authenticate `/mcp` through the customer's approved
+native flow and never store credentials in profiles or packages. Changing the
+connection method requires another profile review and package generation.
 
-## 제공하는 기본 스킬
+## Included skills
 
-## 로컬에서 웹 실행
+| Skill | Purpose |
+| --- | --- |
+| `hf-clarify` | Turn prerequisite-aware clarification into an approved brief. |
+| `hf-plan` | Turn an approved brief into a scoped, test-first implementation plan. |
+| `hf-tdd` | Implement in small red-green-refactor cycles with observed evidence. |
+| `hf-review` | Perform a read-only intent and correctness review with evidence handoff. |
+| `hf-manual` | Create a human-only handoff with an owner and explicit resume evidence. |
+| `hf-issues-markdown` | Manage one Git-tracked Markdown file per issue. |
 
-Docker와 Docker Compose가 필요합니다.
+Sources, pinned revisions, licenses, and Copilot CLI compatibility evidence are
+recorded in [`catalog/catalog.json`](catalog/catalog.json).
+
+## Run the web app locally
+
+Docker and Docker Compose are required.
 
 ```bash
 docker compose up --build
 ```
 
-브라우저에서 <http://localhost:3000>을 엽니다. 첫 실행 시 개발 조직, 멤버십,
-예제 워크플로가 자동으로 준비됩니다.
+Open <http://localhost:3000>. On first run, the stack prepares a development
+organization, membership, and sample workflows.
 
 > [!WARNING]
-> 로컬 스택은 검증되지 않은 개발 신원 헤더를 사용합니다. API와 포털은
-> `127.0.0.1`에만 공개되며 운영 인증을 대신하지 않습니다.
+> The local stack uses unverified development identity headers. The API and portal are
+> exposed only on `127.0.0.1`; this does not replace production authentication.
 
-서비스 상태는 다음 명령으로 확인할 수 있습니다.
+Check service health with:
 
 ```bash
 docker compose ps
 curl --fail http://127.0.0.1:8000/api/health
 ```
 
-## 웹 사용 흐름
+## Web workflow
 
-1. 스튜디오에서 새 인터뷰를 시작하고 다룰 SDLC 범위를 선택합니다.
-2. 고객의 사실, 제약, 승인자와 실패 시 처리 방법을 확인합니다.
-3. 생성된 설계를 편집하고 검증합니다.
-4. 검토자가 현재 digest를 승인하면 빌드를 요청합니다.
-5. 빌드된 버전을 다시 검토하고 레지스트리에 게시합니다.
-6. 사용자는 `hf search`, `hf info`, `hf install`로 패키지를 찾고 설치합니다.
+1. Start an interview in the studio and select the SDLC scope.
+2. Confirm customer facts, constraints, approvers, and failure handling.
+3. Edit and validate the generated design.
+4. Request a build after a reviewer approves the current digest.
+5. Review the built version and publish it to the registry.
+6. Find and install packages with `hf search`, `hf info`, and `hf install`.
 
-승인은 기록된 주장이지 신원 인증이나 권한 강제 수단이 아닙니다. 실제 운영에서는
-Microsoft Entra ID, 조직 멤버십, 고객 시스템 권한을 별도로 구성해야 합니다.
+An approval is a recorded assertion, not identity authentication or authorization
+enforcement. Production deployments must separately configure Microsoft Entra ID,
+organization membership, and permissions in customer systems.
 
-## 문서
+## Documentation
 
-* [CLI 워크플로](docs/cli-workflow.md): standalone 생성, 검사, 설치, 실행 기록
-* [개발 가이드](docs/development.md): 개발 환경, Azure OpenAI 인터뷰, 배포 CLI
-* [운영 가이드](docs/operations.md): Compose, 인증, 데이터 보존, 인수 검증
-* [스킬 계약](.agents/skills/harness-factory/references/contracts.md): 프로필과
-  워크플로 필드
-* [스킬 조립 규칙](.agents/skills/harness-factory/references/composition.md):
-  카탈로그와 고객별 스킬 조립
-* [설계 기록](docs/superpowers/specs/2026-09-11-harness-factory-web-platform-design.md):
-  웹 플랫폼의 설계 배경
+* [CLI workflow](docs/cli-workflow.md): standalone generation, checks, installation,
+  and execution records
+* [Development guide](docs/development.md): development environment, Azure OpenAI
+  interviews, and the delivery CLI
+* [Operations guide](docs/operations.md): Compose, authentication, retention, and
+  acceptance checks
+* [Skill contracts](.agents/skills/harness-factory/references/contracts.md): profile
+  and workflow fields
+* [Skill composition](.agents/skills/harness-factory/references/composition.md):
+  catalog and customer-specific skill assembly
+* [Design record](docs/superpowers/specs/2026-09-11-harness-factory-web-platform-design.md):
+  web platform design background
 
-## 개발 검증
+## Development checks
 
 ```bash
 uv sync --frozen --no-config --extra test --extra cli
@@ -108,15 +127,17 @@ npm run typecheck
 npm run build
 ```
 
-세부 테스트와 PostgreSQL 인수 절차는 [운영 가이드](docs/operations.md)를
-참고하세요.
+See the [operations guide](docs/operations.md) for detailed tests and PostgreSQL
+acceptance procedures.
 
-## 프로젝트 범위
+## Project scope
 
-현재 구현은 웹 기반 authoring과 registry, Python 배포 CLI, standalone core를
-제공합니다. 상시 운영 환경, Entra 앱 등록, Azure 리소스 생성, 고객 커넥터 생성,
-실제 고객 권한 부여는 자동화하지 않습니다.
+The current implementation provides web-based authoring and registry services, a
+Python delivery CLI, and a standalone core. Azure resources and Container Apps
+services can be deployed with `azure.yaml` and the Bicep templates in `infra/`.
+Microsoft Entra app registration, customer connector creation, customer permission
+assignment, and production-readiness validation are not automated.
 
-카탈로그의 출처, 고정 커밋, 라이선스와 호환성 근거는
-[catalog/catalog.json](catalog/catalog.json)에 기록되어 있습니다. 원본 MIT
-고지는 [catalog/licenses](catalog/licenses)에 포함됩니다.
+Catalog sources, pinned commits, licenses, and compatibility evidence are recorded in
+[`catalog/catalog.json`](catalog/catalog.json). Original MIT notices are included in
+[`catalog/licenses`](catalog/licenses).
