@@ -94,7 +94,9 @@ resource artifactShare 'Microsoft.Storage/storageAccounts/fileServices/shares@20
 resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2024-08-01' = {
   name: 'psql-${resourceToken}'
   location: location
-  tags: tags
+  tags: union(tags, {
+    SecurityControl: 'Ignore'
+  })
   sku: {
     name: 'Standard_B1ms'
     tier: 'Burstable'
